@@ -260,7 +260,8 @@ const CFG = {
       revUp: 14000, revDown: 7000,               // カウント中の空ぶかしの回転上昇・下降(rpm/秒)
       vol: 0.033, vtecVol: 0.042, offThrottle: 0.45, shiftCut: 0.06, driftVol: 0.05, // 音量（本体・VTEC高音）
       // 重ねる層の音量比（vol基準）：本体・燃焼の粗さ・低音・排気・吸気の風切り・メカノイズ・破裂音
-      layers: { body: 1, roughness: 0.3, sub: 0.35, exhaust: 0.7, intake: 0.45, mech: 0.3, pop: 1.6, formant: 0.8, echo: 0.35 },
+      worklet: true, wkVol: 0.085, muffler: 1.0, // 物理モデル版（爆発パルス→排気管→マフラー）：音量、マフラーの共鳴の強さ（0で直管寄り、2でこもった重低音）
+      layers: { body: 1, roughness: 0.3, sub: 0.35, exhaust: 0.7, intake: 0.45, mech: 0.3, pop: 1.6, formant: 0.8, echo: 0.35 }, // 以下は従来版（非対応環境用）
       formants: [[1500, 900], [2800, 1400], [4500, 1500]], // 高音の共鳴帯（Hz：アイドル時の中心＋レッドラインまでの上昇幅）
       drive: 6,                  // 歪み（倍音付加）の強さ
       master: 0.8,               // エンジン音全体の音量（層を増やした分、前回の聞こえ方に合わせて下げている）
@@ -2302,6 +2303,81 @@ const Settings = {
 // SOUND：Web Audio APIで全て生成（BGMはステップシーケンサ、効果音は合成）
 // iOSの自動再生制限：最初のタップでAudioContextを作成・再開する
 // =====================================================================
+// エンジン音の本体（AudioWorklet）。対応していない環境では従来の発振器の音を使う
+const ENGINE_WORKLET_SRC = `const TAU = Math.PI * 2;
+function cf(type, f, q, sr) {
+  const w = TAU * Math.min(Math.max(f, 10), sr * 0.45) / sr, a = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + a;
+  if (type === 'bp') return [a / a0, 0, -a / a0, -2 * c / a0, (1 - a) / a0];
+  if (type === 'lp') return [(1 - c) / 2 / a0, (1 - c) / a0, (1 - c) / 2 / a0, -2 * c / a0, (1 - a) / a0];
+  return [(1 + c) / 2 / a0, -(1 + c) / a0, (1 + c) / 2 / a0, -2 * c / a0, (1 - a) / a0];
+}
+class BQ {
+  constructor() { this.c = [0, 0, 0, 0, 0]; this.x1 = this.x2 = this.y1 = this.y2 = 0; }
+  set(c) { this.c = c; }
+  run(x) { const c = this.c, y = c[0] * x + c[1] * this.x1 + c[2] * this.x2 - c[3] * this.y1 - c[4] * this.y2; this.x2 = this.x1; this.x1 = x; this.y2 = this.y1; this.y1 = y; return y; }
+}
+// 物理モデル風のエンジン音：各気筒の爆発パルス → 排気管の共鳴 → マフラー（共鳴室・消音・テールの荒さ）＋吸気（VTEC）＋アフターファイア
+class HKEngine extends AudioWorkletProcessor {
+  static get parameterDescriptors() {
+    return [
+      { name: 'rpm', defaultValue: 1100, minValue: 200, maxValue: 15000, automationRate: 'k-rate' },
+      { name: 'throttle', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+      { name: 'vtec', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+      { name: 'gain', defaultValue: 0, minValue: 0, maxValue: 4, automationRate: 'k-rate' },
+      { name: 'muffler', defaultValue: 1, minValue: 0, maxValue: 2, automationRate: 'k-rate' },
+    ];
+  }
+  constructor() {
+    super();
+    const sr = this.sr = sampleRate;
+    this.t = 0; this.next = 0; this.cyl = 0; this.e1 = 0; this.e2 = 0; this.en = 0; this.pop = 0; this.seed = 22222;
+    this.cv = [1.0, 0.92, 1.06, 0.96];           // 気筒ごとのわずかな差（不均一さ）
+    this.dl = new Float32Array(4096); this.dw = 0; this.lpz = 0;
+    this.dl2 = new Float32Array(4096); this.dw2 = 0; this.lpz2 = 0;
+    this.ch1 = new BQ(); this.ch2 = new BQ(); this.lpo = new BQ(); this.rasp = new BQ(); this.in1 = new BQ(); this.in2 = new BQ();
+    this.mech = new BQ(); this.popf = new BQ(); this.dc = new BQ(); this.body = new BQ();
+    this.k1 = Math.exp(-1 / (0.0009 * sr)); this.k2 = Math.exp(-1 / (0.0045 * sr)); this.kn = Math.exp(-1 / (0.0022 * sr)); this.kp = Math.exp(-1 / (0.016 * sr));
+    this.dc.set(cf('hp', 28, 0.7, sr)); this.ch1.set(cf('bp', 110, 1.2, sr)); this.ch2.set(cf('bp', 340, 1.5, sr));
+    this.popf.set(cf('lp', 1900, 0.8, sr)); this.mech.set(cf('bp', 6800, 1.6, sr)); this.body.set(cf('bp', 190, 0.9, sr));
+  }
+  r() { this.seed = (Math.imul(this.seed, 1664525) + 1013904223) >>> 0; return this.seed / 4294967296; }
+  process(inputs, outputs, P) {
+    const out = outputs[0][0], sr = this.sr, rpm = P.rpm[0], thr = P.throttle[0], vt = P.vtec[0], g = P.gain[0], mf = P.muffler[0];
+    const x = Math.min(1, Math.max(0, (rpm - 1000) / 8000));
+    this.lpo.set(cf('lp', 800 + 2800 * x + 700 * thr, 0.9, sr));
+    this.rasp.set(cf('hp', 1500 + 900 * x, 0.8, sr));
+    const fi = 1350 + 1400 * x; this.in1.set(cf('bp', fi, 6.5, sr)); this.in2.set(cf('bp', fi * 1.93, 8, sr));
+    const period = sr * 60 / (Math.max(300, rpm) * 2);                         // 4気筒：1回転に2回爆発
+    const d1 = Math.round(sr * (0.0072 - 0.0022 * x)), d2 = Math.round(sr * 0.0043); // 排気管・中間パイプの往復時間
+    const fb = 0.40 + 0.10 * thr, fb2 = 0.30;
+    for (let i = 0; i < out.length; i++) {
+      if (this.t >= this.next) {
+        const a = (0.3 + 0.7 * thr) * this.cv[this.cyl] * (1 + (this.r() - 0.5) * 0.2);
+        this.e1 += a; this.e2 += a * 0.6; this.en += a * (0.2 + 0.4 * x);
+        if (thr < 0.2 && rpm > 5200 && this.r() < 0.03) this.pop += 0.9 + this.r() * 0.8; // 減速時のアフターファイア
+        this.cyl = (this.cyl + 1) & 3;
+        this.next += period * (1 + (this.r() - 0.5) * 0.03);
+      }
+      this.t++;
+      const n = this.r() * 2 - 1;
+      const exc = this.e1 - this.e2 * 0.55 + this.en * n;                     // 圧力波（鋭い立ち上がりと戻り）＋燃焼ノイズ
+      this.e1 *= this.k1; this.e2 *= this.k2; this.en *= this.kn;
+      const r1 = this.dl[(this.dw - d1 + 4096) & 4095]; this.lpz += (r1 - this.lpz) * 0.42;
+      const pipe = exc + fb * this.lpz; this.dl[this.dw] = pipe; this.dw = (this.dw + 1) & 4095;
+      const r2 = this.dl2[(this.dw2 - d2 + 4096) & 4095]; this.lpz2 += (r2 - this.lpz2) * 0.5;
+      const pipe2 = pipe + fb2 * this.lpz2; this.dl2[this.dw2] = pipe2; this.dw2 = (this.dw2 + 1) & 4095;
+      let m = (this.ch1.run(pipe2) * 0.9 + this.ch2.run(pipe2) * 0.75 + this.body.run(pipe2) * 0.3) * mf  // マフラーの共鳴室（こもった低音）
+            + this.lpo.run(pipe2) * 0.85 + this.rasp.run(pipe2) * (0.15 + 0.5 * x);          // 抜けてくる音とテールの荒さ
+      m += (this.in1.run(exc) * 1.3 + this.in2.run(exc) * 0.7) * (0.15 + 0.85 * vt) * (0.35 + 0.65 * thr);  // 吸気の叫び（VTEC）
+      if (this.pop > 0.01) { m += this.popf.run(n * this.pop) * 1.5; this.pop *= this.kp; }
+      m += this.mech.run(n) * 0.035 * x * x;                                                // バルブ・カムの擦過音
+      out[i] = Math.tanh(this.dc.run(m) * 0.7) / 0.7 * g;
+    }
+    return true;
+  }
+}
+registerProcessor('hk-engine', HKEngine);
+`;
 const Sound = (() => {
   let ctx = null, master, bgmG, sfxG, noiseBuf, eng = null, drift = null, pending = null;
   const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -2476,6 +2552,18 @@ const Sound = (() => {
     n.buffer = noiseBuf; n.loop = true; dbp.type = 'bandpass'; dbp.frequency.value = 2400; dbp.Q.value = 6; dg.gain.value = 0;
     n.connect(dbp); dbp.connect(dg); dg.connect(sfxG); n.start();
     drift = { bp: dbp, g: dg };
+    // 物理モデル風のエンジン音を読み込む（読み込めたら従来の発振器は止める）
+    if (E.worklet && ctx.audioWorklet && typeof AudioWorkletNode !== 'undefined') try {
+      const url = URL.createObjectURL(new Blob([ENGINE_WORKLET_SRC], { type: 'application/javascript' }));
+      ctx.audioWorklet.addModule(url).then(() => {
+        const node = new AudioWorkletNode(ctx, 'hk-engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+        node.connect(sfxG); eng.wk = node;
+        for (const o of [b1, b2, am, sub, e1, e2, ...vs.map(v => v.o)]) { try { o.stop(); } catch (e) { } }
+        for (const g of [bG, subG, eG, vG, iG, mG]) g.gain.value = 0;
+        eng.mode = 'worklet';
+      }).catch(err => { eng.mode = 'osc（' + (err && err.message || err) + '）'; });
+    } catch (err) { eng.mode = 'osc（' + (err && err.message || err) + '）'; }
+    else eng.mode = 'osc';
   }
   function engine(k, on, revving = false, fdt = 1 / 60) {
     if (!eng) return;
@@ -2513,6 +2601,14 @@ const Sound = (() => {
     P(e.iF.frequency, 600 + x * 2600, 0.05); P(e.mF.frequency, 5500 + x * 3000, 0.05);
     if (e.cut > 0) e.cut -= dt;
     const cut = (e.cut > 0 ? 0.25 : 1) * (limit && Math.floor(t * 22) % 2 ? E.limiterCut : 1), vtec = rpm > E.vtecRpm, a = on ? cut : 0, body = E.vol * (0.5 + 0.5 * x) * thr;
+    if (e.wk) { // 物理モデル版：回転数・アクセル・VTECの効き具合・音量を渡すだけ
+      const W = e.wk.parameters;
+      W.get('rpm').setTargetAtTime(rpm, t, 0.015);
+      W.get('throttle').setTargetAtTime(thrOn ? 1 : 0, t, 0.04);
+      W.get('vtec').setTargetAtTime(vtec ? Math.min(1, (rpm - E.vtecRpm) / 1500) : 0, t, 0.03);
+      W.get('muffler').setTargetAtTime(E.muffler, t, 0.1);
+      W.get('gain').setTargetAtTime(E.wkVol * a * (thrOn ? 1 : E.offThrottle * 1.4), t, 0.03);
+    } else {
     P(e.bG.gain, body * L.body * a);
     P(e.amG.gain, body * L.body * L.roughness * a);
     P(e.subG.gain, E.vol * L.sub * (1 - 0.5 * x) * a);
@@ -2525,6 +2621,7 @@ const Sound = (() => {
     if (on && !thrOn && rpm > E.vtecRpm && e.popT <= 0 && Math.random() < dt * E.popRate) {
       e.popT = 0.06;
       noise({ ft: 'lowpass', f0: 1400 + Math.random() * 1200, dur: 0.05, vol: E.vol * L.pop, dest: e.post });
+    }
     }
     const dOn = on && k.drifting && k.grounded;
     drift.g.gain.setTargetAtTime(dOn ? E.driftVol : 0, t, 0.04);
@@ -2567,7 +2664,7 @@ const Sound = (() => {
   function pauseBgm(sec) { const B = bgmState; if (!ctx || !B.song) return; B.next = ctx.currentTime + sec; B.step = 0; } // 指定秒だけBGMを止めて頭から再開
   document.addEventListener('visibilitychange', () => { if (!ctx) return; if (document.hidden) ctx.suspend(); else ctx.resume(); });
   for (const ev of ['touchend', 'pointerup', 'click', 'keydown']) document.addEventListener(ev, unlock, { passive: true });
-  return { pauseBgm, get rpm() { return eng ? Math.round(eng.rpm) : 0; }, get gear() { return eng ? eng.gear + 1 : 0; }, unlock, play, playAt, engine, bgm, stopBgm, tempo, applyVol, get ready() { return !!ctx; }, get state() { return ctx ? ctx.state : 'none'; }, get bgmName() { return bgmState.name; } };
+  return { get engineMode() { return eng ? eng.mode || '読込中' : '-'; }, pauseBgm, get rpm() { return eng ? Math.round(eng.rpm) : 0; }, get gear() { return eng ? eng.gear + 1 : 0; }, unlock, play, playAt, engine, bgm, stopBgm, tempo, applyVol, get ready() { return !!ctx; }, get state() { return ctx ? ctx.state : 'none'; }, get bgmName() { return bgmState.name; } };
 })();
 
 // 画質：解像度・描画距離・木や山の数・自機のリアルタイム影
@@ -3114,7 +3211,7 @@ const Bench = {
       'ハイパーカート 性能テスト',
       `端末: ${navigator.userAgent}`,
       `画面: ${window.innerWidth}x${window.innerHeight} DPR ${window.devicePixelRatio} / 描画倍率 ${renderer.getPixelRatio().toFixed(2)} / 起動: ${navigator.standalone || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches ? 'ホーム画面アプリ' : 'ブラウザ'}`,
-      `画質: ${CFG.render.quality}（影 ${P.shadow ? 'あり' : 'なし'}・木${P.trees}）/ CPU: ${CFG.ai.difficulty} / 音声: ${Sound.state}`,
+      `画質: ${CFG.render.quality}（影 ${P.shadow ? 'あり' : 'なし'}・木${P.trees}）/ CPU: ${CFG.ai.difficulty} / 音声: ${Sound.state}・エンジン音 ${Sound.engineMode}`,
       'コース / 平均fps / 1%低fps / 30fps未満の割合 / draw calls / 三角形 / CPU時間ms（AI・物理・描画準備・render呼び出し・UI音）',
       ...this.results.map(r => `${r.name} / ${f1(r.fps)} / ${f1(r.low)} / ${f1(r.slow)}% / ${Math.round(r.calls)} / ${Math.round(r.tris)} / ${f2(r.ai)}・${f2(r.phys)}・${f2(r.vis)}・${f2(r.rend)}・${f2(r.ui)}`),
     ].join('\n');
@@ -3320,7 +3417,7 @@ function updateDebug(dt, order) {
   Debug.el.textContent =
     `fps ${Debug.fps.toFixed(1)}  (${Debug.dtMs.toFixed(1)}ms)  view ${App.view} mode ${App.mode}\n` +
     `draw calls ${inf.calls}  tris ${inf.triangles}\n` +
-    `quality ${CFG.render.quality}  pr ${renderer.getPixelRatio().toFixed(2)}  cpu ${CFG.ai.difficulty}  gyro ${Gyro.ok ? (Gyro.raw - Gyro.center).toFixed(1) : '-'}  audio ${Sound.state} bgm ${Sound.bgmName || '-'} rpm ${Sound.rpm} G${Sound.gear}\n` +
+    `quality ${CFG.render.quality}  pr ${renderer.getPixelRatio().toFixed(2)}  cpu ${CFG.ai.difficulty}  gyro ${Gyro.ok ? (Gyro.raw - Gyro.center).toFixed(1) : '-'}  audio ${Sound.state} bgm ${Sound.bgmName || '-'} rpm ${Sound.rpm} G${Sound.gear} engine ${Sound.engineMode}\n` +
     (App.view !== 'race' ? '' :
     `pos ${k.x.toFixed(1)}, ${k.y.toFixed(1)}, ${k.z.toFixed(1)}  ${k.grounded ? 'ground' : 'AIR'} ${SURF_NAME[k.surf]}\n` +
     `speed ${(k.speed * 3.6).toFixed(1)} km/h  drift ${k.drifting ? (k.driftDir > 0 ? 'R' : 'L') : '-'} lv${driftLevel(k.charge)} boost ${k.boostT.toFixed(2)} ${k.lastBoost}\n` +
