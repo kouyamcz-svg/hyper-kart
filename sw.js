@@ -1,6 +1,6 @@
 // ハイパーカート Service Worker：一度開けば通信なしでも起動できるようにする
 // ゲーム本体(index.html)は通信できれば常に最新を取得し、失敗時だけ保存分を使う
-const CACHE = 'hyperkart-v6';
+const CACHE = 'hyperkart-v7';
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png', THREE_URL];
 
