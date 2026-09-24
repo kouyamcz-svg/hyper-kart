@@ -164,6 +164,7 @@ const CFG = {
     quality: 'mid',            // ?q=low|mid|high
     maxPixelRatio: 1.5,
     antialias: false,
+    mountainClear: 40,         // 遠景の山のふもととコースの間に空ける最小距離(m)
     presets: {
       low:  { pixelRatio: 1.0,  drawDistance: 260, trees: 120, mountains: 18, shadow: false },
       mid:  { pixelRatio: 1.25, drawDistance: 380, trees: 220, mountains: 26, shadow: false },
@@ -820,9 +821,11 @@ function buildScenery(tr) {
   const nM = Math.round(QP.mountains * (SC.mountainMul || 1)), MD = SC.mountainDist || [520, 740], MH = SC.mountainH || [60, 180];
   const mtn = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 6), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true, fog: false }), Math.max(1, nM));
   const haze = new THREE.Color(CFG.sky.horizon);
+  let trackR = 0; // コース中心から最も遠いサンプルまでの距離（山がコースに重ならないようにする）
+  for (let i = 0; i < N; i++) trackR = Math.max(trackR, Math.hypot(P[i * 3] - cx, P[i * 3 + 2] - cz));
   for (let i = 0; i < nM; i++) {
-    const a = i / nM * Math.PI * 2 + R() * 0.2, r = MD[0] + R() * (MD[1] - MD[0]);
-    const h = MH[0] + R() * (MH[1] - MH[0]), w = 90 + R() * 110;
+    const a = i / nM * Math.PI * 2 + R() * 0.2, h = MH[0] + R() * (MH[1] - MH[0]), w = 90 + R() * 110;
+    const r = Math.max(MD[0] + R() * (MD[1] - MD[0]), trackR + TR.shoulder + TR.embank + w + CFG.render.mountainClear);
     m.compose(v.set(cx + Math.cos(a) * r, TR.groundY + h / 2 - 2, cz + Math.sin(a) * r), q.identity(), s.set(w, h, w));
     mtn.setMatrixAt(i, m);
     mtn.setColorAt(i, c.setHSL((SC.mountainHue || 0.33) - R() * 0.08, 0.35, 0.32).lerp(haze, CFG.sky.mountainHaze));
