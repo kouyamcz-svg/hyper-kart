@@ -328,7 +328,7 @@ const CFG = {
     homing: { speed: 42, life: 14, chase: 18, hitRadius: 1.5, height: 1.0 },
     trap:   { back: 2.6, hitRadius: 1.4, max: 12, life: 90, ownerGrace: 1.0 },
     jet:    { time: 2.5 },
-    shield: { time: 6 },
+    shield: { time: 6, launch: 14, launchUp: 9 }, // バリア：持続秒数、体当たりで相手を飛ばす速さ（水平・上向き m/s）
     strike: { delay: 1.6, radius: 5, stun: 1.6, beamTime: 0.6 },
     colors: { shot: 0xff8c1a, homing: 0xff2a4a, trap: 0xb070ff, jet: 0x6fe8ff, shield: 0x7fe8ff, strike: 0xbfe9ff, box: [0xff4d6d, 0xffd23f, 0x4dff88, 0x4db8ff, 0xc36bff] },
     cpu: { delay: [0.6, 3.0], forceUse: 8, shotCone: 0.15, shotRange: 45, trapBehind: 18, shieldBehind: 15, jetAngle: 0.15, avoidAhead: [3, 30], avoidWidth: 2.4, avoidShift: 2.8 },
@@ -1481,8 +1481,19 @@ function collideKarts(ks) {
     const dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz;
     if (d2 >= R2 * R2) continue;
     const d = Math.sqrt(d2) || 1e-3, nx = dx / d, nz = dz / d, ov = R2 - d;
-    if (a.shieldT > 0 && b.shieldT <= 0) Items.hitKart(b, 1, 'shield', a); // バリア中の体当たりで相手をスピン
-    if (b.shieldT > 0 && a.shieldT <= 0) Items.hitKart(a, 1, 'shield', b);
+    // バリア中の体当たり：相手だけを吹き飛ばし、バリア側は減速も押し戻しもなくそのまま進む
+    if ((a.shieldT > 0) !== (b.shieldT > 0)) {
+      const sA = a.shieldT > 0, sh = sA ? a : b, o = sA ? b : a, sx = sA ? nx : -nx, sz = sA ? nz : -nz, SH = CFG.items.shield;
+      o.x += sx * ov; o.z += sz * ov; // 重なりは全部相手側へ
+      if (Items.hitKart(o, 1, 'shield', sh)) {
+        const vs = Math.max(0, sh.vx * sx + sh.vz * sz), vo = o.vx * sx + o.vz * sz;
+        const push = Math.max(0, vs + SH.launch - vo);
+        o.vx += sx * push; o.vz += sz * push;
+        o.vy = SH.launchUp; o.grounded = false; o.air = 0; // 宙に浮かせる
+      }
+      wallCollide(o);
+      continue;
+    }
     const wa = a.st.weight, wb = b.st.weight, ta = wb / (wa + wb), tb = wa / (wa + wb);
     a.x -= nx * ov * ta; a.z -= nz * ov * ta; b.x += nx * ov * tb; b.z += nz * ov * tb;
     wallCollide(a); wallCollide(b); // 押し合いでガードレールの外へ押し出されないようにする
