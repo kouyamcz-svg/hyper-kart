@@ -181,7 +181,7 @@ const CFG = {
     deck: 1.2, pillarEvery: 10, // 橋（立体交差の上側）：床の厚み・橋脚の間隔（サンプル数）
   },
   // 路面種別ごとの最高速倍率・超過時減速：0路面 1縁石 2芝 3法面 4ジャンプ台 5場外 6砂
-  surface: { maxMul: [1, 1, 0.5, 0.4, 1, 1, 0.5], drag: [0, 0, 12, 14, 0, 0, 12] }, // 6:砂（ショートカット。ブースト無しでは近道にならない速さ）
+  surface: { maxMul: [1, 1, 0.5, 0.4, 1, 1, 0.5, 0.9], drag: [0, 0, 12, 14, 0, 0, 12, 6] }, // 7:路地（狭い近道、ほぼ全速） // 6:砂（ショートカット。ブースト無しでは近道にならない速さ）
   kart: {
     maxSpeed: 28, accel: 13, brake: 28, reverseMax: 7, coastDrag: 3.5,
     turnRate: 2.1, turnSpeedRef: 7, highSpeedTurnLoss: 0.35,
@@ -330,8 +330,8 @@ const CFG = {
 { const q = URLP.get('q'); if (q && CFG.render.presets[q]) CFG.render.quality = q; }
 { const c = URLP.get('cpu'); if (c && CFG.ai.levels[c]) CFG.ai.difficulty = c; }
 let QP = CFG.render.presets[CFG.render.quality];
-const SURF = { ROAD: 0, CURB: 1, GRASS: 2, EMBANK: 3, RAMP: 4, OB: 5, SAND: 6 };
-const SURF_NAME = ['road', 'curb', 'grass', 'embank', 'ramp', 'OB', 'sand'];
+const SURF = { ROAD: 0, CURB: 1, GRASS: 2, EMBANK: 3, RAMP: 4, OB: 5, SAND: 6, ALLEY: 7 };
+const SURF_NAME = ['road', 'curb', 'grass', 'embank', 'ramp', 'OB', 'sand', 'alley'];
 
 // =====================================================================
 // COURSE DATA
@@ -421,7 +421,86 @@ const COURSES = [{
     lineA: 0xffffff, lineB: 0x222222, cliff: 0xc8b08a, water: 0x3a93d6,
     rampA: 0xff3fa4, rampB: 0xffffff, rampSide: 0x9a6b2f, deck: 0xcfcfcf, sand: 0xf0dca0,
   },
-}];
+}, {
+  // ④ ネオンストリート：夜の繁華街。8の字の立体交差、シケイン、交差点を飛び越えるジャンプ、公園を抜ける近道
+  id: 'n1', cup: 1, name: 'ネオンストリート', bgm: 'neon', groundY: -2.5,
+  env: { top: 0x0b0a2a, horizon: 0x3a1d5c, hemi: 0.75, dir: 0.9, hemiColor: 0x9aa8ff, groundColor: 0x2a1a3a, dirColor: 0xc8c0ff },
+  points: [
+    [0, -100, 0, 12, 0], [0, -40, 0, 12, 0], [0, 0, 0, 12, 0], [0, 50, 0.5, 12, 0], [2, 100, 1.5, 12, 0],
+    [15, 125, 2.5, 11, -6], [45, 135, 3, 11, -2], [85, 134, 4, 11, 0], [105, 127, 4.5, 10, 0], [122, 139, 5, 10, 0], [142, 130, 5.5, 10, -2],
+    [165, 108, 6, 11, -8], [170, 70, 7, 11, -2], [160, 30, 8, 11, -6], [130, 8, 8.5, 11, -2],
+    [70, 2, 9, 12, 0], [0, 0, 9, 12, 0], [-60, -2, 8.5, 12, 0], [-100, -8, 6.5, 11, 0],
+    [-135, -30, 5, 11, 6], [-145, -70, 3.5, 11, 4], [-130, -110, 2, 11, 6], [-90, -130, 1, 11, 2], [-40, -128, 0.3, 12, 0], [-12, -118, 0, 12, 4],
+  ],
+  ramps: [{ at: 17.35, lat: 0, width: 12.4, length: 9, height: 1.8 }],
+  gaps: [{ from: 17.47, to: 17.75 }],
+  dashes: [{ at: 1.4, lat: 0, width: 4, length: 6 }, { at: 17.1, lat: 0, width: 5, length: 6 }, { at: 22.5, lat: -2.5, width: 4, length: 6 }],
+  itemBoxes: [
+    { at: 3.4, lats: [-4.5, -1.5, 1.5, 4.5] }, { at: 7.3, lats: [-3.8, -1.3, 1.3, 3.8] },
+    { at: 15.4, lats: [-4.5, -1.5, 1.5, 4.5] }, { at: 21.4, lats: [-3.8, -1.3, 1.3, 3.8] },
+  ],
+  shortcut: { from: 4.3, to: 6.6, side: -1, width: 8, surface: 'alley' },
+  scenery: { city: { near: 0.45, heights: [18, 80], far: 44, lamps: true, lampColor: 0xffc27a }, stars: true, mountainMul: 0, treeMul: 0.25, leafHue: 0.33 },
+  colors: {
+    road1: 0x2c2d36, road2: 0x292a32, curbA: 0x21e6ff, curbB: 0xff2fb8,
+    grass: 0x3a3f4a, embank: 0x2e3240, ground: 0x1b1d26, rail: 0xb8c0d0, post: 0x6a7080,
+    lineA: 0xffffff, lineB: 0x222222, cliff: 0x3a3a44, water: 0x1a3a6a,
+    rampA: 0xff2fb8, rampB: 0x21e6ff, rampSide: 0x444455, deck: 0x585c68, sand: 0x5a4f44, alley: 0x3a3440,
+  },
+}, {
+  // ⑤ ハーバーライン：夜の港。柵のない桟橋（Uターンのヘアピン）、運河を飛び越えるジャンプ、コンテナ置き場の近道
+  id: 'n2', cup: 1, name: 'ハーバーライン', bgm: 'harbor', groundY: -3,
+  env: { top: 0x061530, horizon: 0x1f3d6a, hemi: 0.8, dir: 0.9, hemiColor: 0x9ac0ff, groundColor: 0x10203a, dirColor: 0xbcd4ff },
+  points: [
+    [0, -80, 1.5, 13, 0], [0, 0, 1.5, 13, 0], [0, 70, 1.5, 13, 0], [15, 115, 2, 12, -6], [55, 135, 2.5, 12, -4],
+    [110, 140, 2, 10, 0], [170, 140, 2, 10, 0], [205, 130, 2, 10, -10], [205, 105, 2, 10, -10], [170, 95, 2, 10, 0], [110, 95, 2, 10, 0],
+    [80, 75, 2, 11, 6], [75, 40, 2, 11, 2], [75, 10, 2, 11, 0], [75, -30, 2, 11, 0],
+    [80, -70, 2.5, 11, 0], [55, -105, 3, 11, 6], [18, -128, 2.5, 12, 6], [-14, -118, 2, 12, 6], [-12, -100, 1.8, 13, 2],
+  ],
+  ramps: [{ at: 13.15, lat: 0, width: 11.4, length: 10, height: 2.2 }],
+  gaps: [{ from: 13.27, to: 13.58 }],
+  edges: [{ from: 5.1, to: 10.0, side: -1, rail: false, cliff: true }, { from: 5.1, to: 10.0, side: 1, rail: false, cliff: true }],
+  dashes: [{ at: 1.0, lat: 0, width: 5, length: 6 }, { at: 12.8, lat: 0, width: 5, length: 6 }, { at: 5.5, lat: 0, width: 3.5, length: 6 }],
+  itemBoxes: [
+    { at: 2.0, lats: [-5, -1.7, 1.7, 5] }, { at: 6.0, lats: [-3, 0, 3] },
+    { at: 11.8, lats: [-3.8, -1.3, 1.3, 3.8] }, { at: 17.0, lats: [-4.5, -1.5, 1.5, 4.5] },
+  ],
+  shortcut: { from: 6.0, to: 9.0, side: -1, width: 8 },
+  scenery: { city: { near: 0.3, heights: [8, 26], far: 36, lamps: true, lampColor: 0xfff0c0 }, stars: true, mountainMul: 0, treeMul: 0 },
+  colors: {
+    road1: 0x34363e, road2: 0x303238, curbA: 0xffffff, curbB: 0xffb020,
+    grass: 0x4a4a52, embank: 0x5a5448, ground: 0x0e2a4a, rail: 0xd0d4dc, post: 0x70767e,
+    lineA: 0xffffff, lineB: 0x222222, cliff: 0x4a4640, water: 0x12345a,
+    rampA: 0xffb020, rampB: 0x222222, rampSide: 0x444455, deck: 0x6a6e76, sand: 0x6e5a40,
+  },
+}, {
+  // ⑥ 帝王ハイウェイ：高架の首都高。スタートの直線をまたぐ立体交差、1周＋1/4の下りらせん、柵のない高所、高架の切れ目の大ジャンプ
+  id: 'n3', cup: 1, name: '帝王ハイウェイ', bgm: 'highway', groundY: -2.5, bridgeAbove: 5,
+  env: { top: 0x12071f, horizon: 0x4a1c3c, hemi: 0.75, dir: 0.85, hemiColor: 0xffb0d0, groundColor: 0x2a1020, dirColor: 0xffc8e0 },
+  points: [
+    [0, -120, 0, 12, 0], [0, -60, 2, 12, 0], [0, 0, 6, 11, 0], [0, 60, 11, 11, 0], [10, 110, 15, 11, -4],
+    [45, 140, 18, 10, -8], [95, 145, 20, 10, -6], [140, 120, 21, 10, -6], [160, 75, 22, 10, -2], [150, 20, 21, 10, 0],
+    [110, -5, 17, 10, -6], [60, -10, 14, 10, 0], [-50, -12, 14, 10, 0],
+    [-100, -15, 14, 10, 8], [-140, -55, 11.5, 10, 8], [-100, -95, 9, 10, 8], [-60, -55, 6.5, 10, 8],
+    [-100, -15, 4, 10, 8], [-140, -55, 1.5, 11, 6], [-140, -100, 0.5, 11, 2], [-120, -140, 0, 11, 6], [-70, -160, 0, 12, 2], [-20, -155, 0, 12, 4],
+  ],
+  ramps: [{ at: 8.35, lat: 0, width: 10.4, length: 10, height: 2.4 }],
+  gaps: [{ from: 8.47, to: 8.68 }],
+  edges: [{ from: 5.2, to: 7.4, side: 1, rail: false }],
+  dashes: [{ at: 1.2, lat: 0, width: 5, length: 6 }, { at: 8.1, lat: 0, width: 5, length: 6 }, { at: 12.4, lat: 0, width: 4, length: 6 }, { at: 20.5, lat: 0, width: 5, length: 6 }],
+  itemBoxes: [
+    { at: 2.4, lats: [-3.8, -1.3, 1.3, 3.8] }, { at: 6.3, lats: [-3, 0, 3] },
+    { at: 11.5, lats: [-3, 0, 3] }, { at: 19.5, lats: [-3.8, -1.3, 1.3, 3.8] },
+  ],
+  scenery: { city: { near: 0.55, heights: [25, 110], far: 50, lamps: true, lampColor: 0xff9fd0, lampEvery: 12 }, stars: true, mountainMul: 0, treeMul: 0 },
+  colors: {
+    road1: 0x2e2c34, road2: 0x2a2830, curbA: 0xffffff, curbB: 0xff3a5a,
+    grass: 0x3c3844, embank: 0x34303c, ground: 0x181420, rail: 0xc8c0d0, post: 0x686070,
+    lineA: 0xffffff, lineB: 0x222222, cliff: 0x3a3440, water: 0x1a2a4a,
+    rampA: 0xff3a5a, rampB: 0xffffff, rampSide: 0x444455, deck: 0x5c5866, sand: 0x5a4f44,
+  },
+}
+];
 
 // =====================================================================
 // RENDER
@@ -434,7 +513,8 @@ scene.background = new THREE.Color(CFG.sky.horizon);
 scene.fog = new THREE.Fog(CFG.sky.fog, QP.drawDistance * 0.35, QP.drawDistance);
 const camera = new THREE.PerspectiveCamera(CFG.camera.fovBase, 16 / 9, CFG.camera.near, CFG.camera.far);
 
-scene.add(new THREE.HemisphereLight(0xe6f2ff, 0x5a7a40, CFG.light.hemi));
+const hemi = new THREE.HemisphereLight(0xe6f2ff, 0x5a7a40, CFG.light.hemi);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff4e0, CFG.light.dir);
 sun.position.set(0.5, 1, 0.3);
 scene.add(sun);
@@ -531,6 +611,9 @@ function buildTrack(def) {
   const length = curve.getLength();
   const N = Math.max(200, Math.round(length * CFG.track.samplesPerMeter));
   const P = new Float32Array(N * 3), T = new Float32Array(N * 3), S = new Float32Array(N * 3), U = new Float32Array(N * 3), HW = new Float32Array(N);
+  // バンク角の向きはカーブの向きから自動で決める（常にカーブの外側が高くなる）。データの値は大きさとして使う
+  const bk = def.points.map((q, i) => { const a0 = def.points[(i - 1 + n) % n], c0 = def.points[(i + 1) % n];
+    const cr = (q[0] - a0[0]) * (c0[1] - q[1]) - (q[1] - a0[1]) * (c0[0] - q[0]); return Math.abs(q[4]) * (cr < 0 ? 1 : -1); });
   const Y = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), tan = new THREE.Vector3(), side = new THREE.Vector3(),
         up = new THREE.Vector3(), sb = new THREE.Vector3(), ub = new THREE.Vector3();
   for (let i = 0; i < N; i++) {
@@ -540,7 +623,7 @@ function buildTrack(def) {
     const f = t * n, a = Math.floor(f) % n, b = (a + 1) % n;
     let w = f - Math.floor(f); w = w * w * (3 - 2 * w);
     const hw = (def.points[a][3] * (1 - w) + def.points[b][3] * w) / 2;
-    const bank = (def.points[a][4] * (1 - w) + def.points[b][4] * w) * Math.PI / 180;
+    const bank = (bk[a] * (1 - w) + bk[b] * w) * Math.PI / 180;
     side.crossVectors(tan, Y).normalize();
     up.crossVectors(side, tan).normalize();
     sb.copy(side).multiplyScalar(Math.cos(bank)).addScaledVector(up, Math.sin(bank)).normalize();
@@ -572,7 +655,7 @@ function buildTrack(def) {
     const edgePt = (i, lat) => [P[i * 3] + S[i * 3] * lat, P[i * 3 + 2] + S[i * 3 + 2] * lat, P[i * 3 + 1] + S[i * 3 + 1] * lat];
     const a = sampleAt(sc.from), b = sampleAt(sc.to), L = sg * (HW[a] + TRs.shoulder - 0.5), L2 = sg * (HW[b] + TRs.shoulder - 0.5);
     const a0 = edgePt((a - open + N) % N, L), a1 = edgePt((a + open) % N, L), b0 = edgePt((b - open + N) % N, L2), b1 = edgePt((b + open) % N, L2);
-    def.pads = [...(def.pads || []), { pts: [a0, a1, b0, b1].map(q => [q[0], q[1], q[2] - 0.03]) }];
+    def.pads = [...(def.pads || []), { pts: [a0, a1, b0, b1].map(q => [q[0], q[1], q[2] - 0.03]), type: sc.surface === 'alley' ? SURF.ALLEY : SURF.SAND }];
     def._padDone = true;
   }
   if (def.shortcut) { // 砂地との接続部はガードレールなし（毎回の生成で適用）
@@ -592,6 +675,7 @@ function buildTrack(def) {
   }
   const bridge = new Uint8Array(N);
   for (let i = 0; i < N; i++) if (raw[i]) for (let k = -5; k <= 5; k++) bridge[(i + k + N) % N] = 1;
+  if (def.bridgeAbove !== undefined) for (let i = 0; i < N; i++) if (P[i * 3 + 1] - CFG.track.groundY > def.bridgeAbove) bridge[i] = 1; // 高架区間は全部橋
   return { def, curve, length, N, P, T, S, U, HW, sampleAt, rail, cliff, gap, bridge };
 }
 
@@ -728,8 +812,8 @@ function buildTrackMeshes(tr) {
     const pp = [], pc = [], sand = cc(C.sand), side = cc(C.embank);
     const tri = (a, b, c2, col, type) => { for (const v of [a, b, c2]) { pp.push(v[0], v[1], v[2]); pc.push(col.r, col.g, col.b); } if (type >= 0) colAddTri(a, b, c2, type); };
     for (const pd of def.pads) {
-      const v = pd.pts.map(q => [q[0], q[2], q[1]]);
-      for (let k = 1; k < v.length - 1; k++) tri(v[0], v[k], v[k + 1], sand, SURF.SAND);
+      const v = pd.pts.map(q => [q[0], q[2], q[1]]), ty = pd.type || SURF.SAND, col = ty === SURF.ALLEY ? cc(C.alley || C.road1) : sand;
+      for (let k = 1; k < v.length - 1; k++) tri(v[0], v[k], v[k + 1], col, ty);
       for (let k = 0; k < v.length; k++) { // 側面を地面まで
         const a = v[k], b = v[(k + 1) % v.length], a0 = [a[0], TR.groundY, a[2]], b0 = [b[0], TR.groundY, b[2]];
         tri(a, b, b0, side, -1); tri(a, b0, a0, side, -1);
@@ -758,7 +842,7 @@ function buildTrackMeshes(tr) {
 }
 
 function buildScenery(tr) {
-  const { N, P, HW, def, cliff } = tr, TR = CFG.track, C = def.colors;
+  const { N, P, S, HW, def, cliff } = tr, TR = CFG.track, C = def.colors;
   const group = new THREE.Group();
   let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
   for (let i = 0; i < N; i++) { const x = P[i * 3], z = P[i * 3 + 2]; minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); }
@@ -831,7 +915,51 @@ function buildScenery(tr) {
     mtn.setColorAt(i, c.setHSL((SC.mountainHue || 0.33) - R() * 0.08, 0.35, 0.32).lerp(haze, CFG.sky.mountainHaze));
   }
   mtn.count = nM;
-  group.add(mtn);
+  if (nM > 0) group.add(mtn);
+  // 夜の街：ビル（窓が光る）、遠くのビル群、街灯、星
+  if (SC.city) {
+    const CT = SC.city;
+    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128;
+    const g = cv.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 64, 128);
+    const wc = ['#ffd98a', '#fff4d6', '#8fe3ff', '#ff9ad5'];
+    for (let yy = 4; yy < 124; yy += 10) for (let xx = 4; xx < 60; xx += 10) if (R() < 0.45) { g.fillStyle = wc[Math.floor(R() * wc.length)]; g.fillRect(xx, yy, 6, 6); }
+    const wt = new THREE.CanvasTexture(cv); wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(2, 5); wt.colorSpace = THREE.SRGBColorSpace;
+    const bg = new THREE.BoxGeometry(1, 1, 1); bg.translate(0, 0.5, 0);
+    const mk = (n, fog) => new THREE.InstancedMesh(bg, new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveMap: wt, emissiveIntensity: 0.9, fog }), Math.max(1, n));
+    const nb = Math.round(QP.trees * (CT.near || 0.4)), bm = mk(nb, true), H = CT.heights || [15, 70];
+    let nbPlaced = 0;
+    for (let t = 0; t < nb * 30 && nbPlaced < nb; t++) {
+      const x = minX - 150 + R() * (maxX - minX + 300), z = minZ - 150 + R() * (maxZ - minZ + 300), w = 12 + R() * 18, dd = 12 + R() * 18;
+      let ok = true;
+      for (let i = 0; i < N; i += 2) { const dx = P[i * 3] - x, dz = P[i * 3 + 2] - z, lim = HW[i] + TR.shoulder + TR.embank + Math.max(w, dd) * 0.75 + 4; if (dx * dx + dz * dz < lim * lim) { ok = false; break; } }
+      if (!ok) continue;
+      m.compose(v.set(x, TR.groundY, z), q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), R() * 0.3), s.set(w, H[0] + R() * (H[1] - H[0]), dd));
+      bm.setMatrixAt(nbPlaced, m); bm.setColorAt(nbPlaced, c.setHSL(0.62 + R() * 0.12, 0.25, 0.12 + R() * 0.1)); nbPlaced++;
+    }
+    bm.count = nbPlaced; group.add(bm);
+    let tR = 0; for (let i = 0; i < N; i++) tR = Math.max(tR, Math.hypot(P[i * 3] - cx, P[i * 3 + 2] - cz));
+    const nf = CT.far || 40, fm = mk(nf, false);
+    for (let i = 0; i < nf; i++) {
+      const a = i / nf * Math.PI * 2 + R() * 0.1, r = tR + 220 + R() * 220, w = 30 + R() * 40;
+      m.compose(v.set(cx + Math.cos(a) * r, TR.groundY, cz + Math.sin(a) * r), q.identity(), s.set(w, 60 + R() * 160, w));
+      fm.setMatrixAt(i, m); fm.setColorAt(i, c.setHSL(0.68, 0.3, 0.08 + R() * 0.06));
+    }
+    group.add(fm);
+    if (CT.lamps) { // 街灯（ガードレールの外側、一定間隔）
+      const every = CT.lampEvery || 14, pts = [];
+      for (let i = 0; i < N; i += every) { if (tr.gap[i]) continue; for (const sg of [-1, 1]) { const i3 = i * 3, l = sg * (HW[i] + TR.shoulder + 0.7); pts.push([P[i3] + S[i3] * l, P[i3 + 1] + S[i3 + 1] * l, P[i3 + 2] + S[i3 + 2] * l]); } }
+      const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.16, 7, 5), new THREE.MeshLambertMaterial({ color: 0x3a3f4a }), pts.length);
+      const hm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.45, 8, 6), new THREE.MeshBasicMaterial({ color: CT.lampColor || 0xffd9a0 }), pts.length);
+      pts.forEach((p2, k) => { m.makeTranslation(p2[0], p2[1] + 3.5, p2[2]); pm.setMatrixAt(k, m); m.makeTranslation(p2[0], p2[1] + 7.1, p2[2]); hm.setMatrixAt(k, m); });
+      group.add(pm, hm);
+    }
+  }
+  if (SC.stars) {
+    const n = 500, sp = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { const a = R() * Math.PI * 2, e = 0.12 + R() * 1.3, r = 1300; sp[i * 3] = cx + Math.cos(a) * Math.cos(e) * r; sp[i * 3 + 1] = Math.sin(e) * r; sp[i * 3 + 2] = cz + Math.sin(a) * Math.cos(e) * r; }
+    const sg2 = new THREE.BufferGeometry(); sg2.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    group.add(new THREE.Points(sg2, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, fog: false })));
+  }
   return group;
 }
 
@@ -887,6 +1015,8 @@ function loadCourse(i) {
   CFG.track.groundY = COURSES[i].groundY !== undefined ? COURSES[i].groundY : -2.5;
   CFG.sky.top = env.top || 0x3f8fe0; CFG.sky.horizon = env.horizon || 0xd2ebff; CFG.sky.fog = env.horizon || 0xd2ebff;
   sky.material.uniforms.top.value.setHex(CFG.sky.top); sky.material.uniforms.hor.value.setHex(CFG.sky.horizon);
+  hemi.intensity = env.hemi !== undefined ? env.hemi : CFG.light.hemi; sun.intensity = env.dir !== undefined ? env.dir : CFG.light.dir;
+  hemi.color.setHex(env.hemiColor || 0xe6f2ff); hemi.groundColor.setHex(env.groundColor || 0x5a7a40); sun.color.setHex(env.dirColor || 0xfff4e0);
   scene.background.setHex(CFG.sky.horizon); scene.fog.color.setHex(CFG.sky.fog);
   TRACK = buildTrack(COURSES[i]);
   courseGroup.add(buildTrackMeshes(TRACK), buildScenery(TRACK));
@@ -1325,7 +1455,7 @@ function stepKart(k, inp, dt) {
 
   const q = trackQuery(k.x, k.z, k.idx, k.y);
   k.idx = q.idx; k.lat = q.lat; k.u = q.u;
-  if (k.grounded && k.surf === SURF.SAND) k.scT = CFG.race.shortcutGrace; else if (k.scT > 0) k.scT -= dt;
+  if (k.grounded && (k.surf === SURF.SAND || k.surf === SURF.ALLEY)) k.scT = CFG.race.shortcutGrace; else if (k.scT > 0) k.scT -= dt;
   Race.progress(k);
 
   k.speed = k.vx * Math.sin(k.yaw) + k.vz * Math.cos(k.yaw);
@@ -1347,6 +1477,7 @@ function collideKarts(ks) {
     if (b.shieldT > 0 && a.shieldT <= 0) Items.hitKart(a, 1, 'shield', b);
     const wa = a.st.weight, wb = b.st.weight, ta = wb / (wa + wb), tb = wa / (wa + wb);
     a.x -= nx * ov * ta; a.z -= nz * ov * ta; b.x += nx * ov * tb; b.z += nz * ov * tb;
+    wallCollide(a); wallCollide(b); // 押し合いでガードレールの外へ押し出されないようにする
     const vrel = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
     if (vrel < 0) {
       const J = -(1 + C.restitution) * vrel / (1 / wa + 1 / wb); // 重さを考慮した衝撃量（重いほど速度が変わりにくい）
@@ -2168,6 +2299,15 @@ const Sound = (() => {
     seaside: { bpm: 132, chords: 'F Dm A# C F Dm A# C',
       lead: 'A5 - C6 - F6 - C6 - | D6 - A5 - F5 - A5 - | A#5 - D6 - F6 - D6 C6 | C6 - E6 - G6 - - - | F6 - E6 C6 A5 - C6 - | D6 - C6 A5 F5 - D5 - | D5 F5 A#5 D6 C6 A#5 A5 G5 | G5 - E5 - C5 - - -',
       k: 'x..x..x...x..x..', s: '....x.......x...', h: '..x...x...x...x.', bass: 'r.or.or.', leadType: 'triangle', arp: true },
+    neon: { bpm: 124, chords: 'Am F C G Am F C E',
+      lead: 'E5 - A5 - C6 - B5 A5 | A5 - F5 - A5 - C6 - | G5 - E5 - C5 - E5 G5 | B5 - D6 - B5 - G5 - | E6 - D6 C6 A5 - C6 - | C6 - A5 F5 A5 - F5 - | E5 G5 C6 E6 D6 C6 B5 G5 | G#5 - B5 - E6 - - -',
+      k: 'x...x...x...x...', s: '....x.......x...', h: '..x...x...x...x.', bass: 'rorororo', leadType: 'square', arp: true },
+    harbor: { bpm: 116, chords: 'Em A Em A C D Em B',
+      lead: 'E5 - G5 E5 - B5 A5 G5 | A5 - C#6 - E6 - C#6 - | G5 - B5 G5 - E6 D6 B5 | A5 - - - E5 - A5 - | C6 - E6 C6 G5 - E5 - | D6 - F#6 - A5 - F#5 - | E5 G5 B5 E6 D6 B5 G5 E5 | D#5 - F#5 - B5 - - -',
+      k: 'x..x....x.x.....', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', bass: 'r.ror.ro', leadType: 'triangle', arp: true },
+    highway: { bpm: 168, chords: 'Cm G# A# G Cm G# A# G',
+      lead: 'C6 - G5 - D#6 - D6 C6 | C6 - G#5 - C6 - D#6 - | D6 - A#5 - F5 - A#5 D6 | D6 - B5 - G5 - - - | C6 D#6 G6 D#6 C6 - G5 - | G#5 C6 D#6 C6 G#5 - D#5 - | A#5 D6 F6 D6 A#5 - F5 - | G5 - B5 - D6 - G6 - ',
+      k: 'x.....x...x.....', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', bass: 'rrrrorro', leadType: 'square', arp: true },
     podium: { bpm: 124, chords: 'C F G C C F G C', lead: 'G5 - G5 G5 C6 - - - | A5 - A5 A5 C6 - F6 - | D6 - D6 D6 B5 - G5 - | C6 - E6 - G6 - - - | E6 - D6 C6 G5 - - - | F5 A5 C6 F6 A6 - - - | G6 - F6 - D6 - B5 - | C6 - G5 - C6 - - -',
       k: 'x...x...x...x...', s: '....x.......x.xx', h: 'x.x.x.x.x.x.x.x.', bass: 'r.r.o.r.', leadType: 'square', arp: true },
   };
@@ -2793,6 +2933,11 @@ function updateHUD(dt) {
 // =====================================================================
 // MENU：各画面（HTMLを生成して #menu に描画）
 // =====================================================================
+const CUPS = [
+  { name: 'サンシャインカップ', note: '昼の3コース' },
+  { name: 'ミッドナイトカップ', note: '夜の帝王シティ・難易度高め' },
+];
+const cupCourses = k => COURSES.map((c, i) => ((c.cup || 0) === k ? i : -1)).filter(i => i >= 0);
 const DIFF_NAME = { easy: 'よわい', normal: 'ふつう', hard: 'つよい' };
 const Menu = {
   el: $('menu'), cur: '', data: null,
@@ -2813,7 +2958,7 @@ const Menu = {
         <div class="mbtn primary" data-act="start" style="text-align:center;font-size:20px;pointer-events:auto">タップしてスタート</div>
         <p class="note">端末を横にして遊んでください</p></div>`,
     mode: () => `<div class="panel"><h2>モード選択</h2>
-        <div class="mbtn" data-act="mode" data-v="gp">グランプリ<small>全${COURSES.length}コースの合計ポイントで競う（CPU ${MAX_KARTS - 1}台）</small></div>
+        <div class="mbtn" data-act="mode" data-v="gp">グランプリ<small>カップ（3コース）の合計ポイントで競う（CPU ${MAX_KARTS - 1}台）</small></div>
         <div class="mbtn" data-act="mode" data-v="ta">タイムアタック<small>1台で走り、ベストタイムのゴーストと競う</small></div>
         <div class="mbtn" data-act="settings">設定<small>CPUの強さ・操作・ボタン配置</small></div>
         <div class="mbtn dim" data-act="back" data-v="title">戻る</div></div>`,
@@ -2827,12 +2972,11 @@ const Menu = {
         <div>ハンドリング <span class="stars">${starsOf('handling', s.handling)}</span></div><div>重さ　　<span class="stars">${starsOf('weight', s.weight)}</span></div></div>`;
     },
     course: () => `<div class="panel"><h2>コース選択</h2>
-        ${COURSES.map((c, i) => { const b = Ghost.best(i); return `<div class="mbtn" data-act="course" data-v="${i}">${c.name}<small>ベスト ${b ? fmt(b) : '記録なし'}</small></div>`; }).join('')}
+        ${CUPS.map((cup, k) => `<p class="note">${cup.name}</p><div class="grid2">${cupCourses(k).map(i => { const b = Ghost.best(i); return `<div class="mbtn" data-act="course" data-v="${i}">${COURSES[i].name}<small>ベスト ${b ? fmt(b) : '記録なし'}</small></div>`; }).join('')}</div>`).join('')}
         <div class="mbtn dim" data-act="back" data-v="char">戻る</div></div>`,
-    gpInfo: () => `<div class="panel"><h2>グランプリ</h2><p class="note">CPUの強さ：${DIFF_NAME[CFG.ai.difficulty]}　全${COURSES.length}レース・各${CFG.race.laps}周</p>
-        ${COURSES.map((c, i) => `<div class="srow"><span class="lab">第${i + 1}戦　${c.name}</span></div>`).join('')}
-        <p class="note">順位ポイント：${CFG.gp.points.map((p, i) => `${i + 1}位${p}`).join('・')}</p>
-        <div class="rowb"><div class="mbtn dim" data-act="back" data-v="char">戻る</div><div class="mbtn primary" data-act="gpStart">スタート</div></div></div>`,
+    gpInfo: () => `<div class="panel"><h2>グランプリ</h2><p class="note">CPUの強さ：${DIFF_NAME[CFG.ai.difficulty]}　各${CFG.race.laps}周・順位ポイント ${CFG.gp.points.join('・')}</p>
+        ${CUPS.map((cup, k) => `<div class="mbtn" data-act="gpStart" data-v="${k}">${cup.name}<small>${cup.note}　${cupCourses(k).map(i => COURSES[i].name).join(' → ')}</small></div>`).join('')}
+        <div class="mbtn dim" data-act="back" data-v="char">戻る</div></div>`,
     settings: () => {
       const s = Settings.s;
       const seg = (key, val, label, act = 'set') => `<div class="seg ${s[key] === val ? 'on' : ''}" data-act="${act}" data-v='${key}:${JSON.stringify(val)}'>${label}</div>`;
@@ -2861,7 +3005,7 @@ const Menu = {
         <div class="rowb" style="margin-top:8px"><div class="mbtn primary" data-act="gpStand">次へ</div></div></div>`,
     gpStand: d => `<div class="panel wide"><h2>総合順位（${d.done}/${d.total}戦）</h2>
         <table class="res">${d.rows.map((r, i) => `<tr class="${r.k.isPlayer ? 'me' : ''}"><td>${i + 1}位</td><td>${r.k.name}</td><td class="r">${r.pts}pt</td></tr>`).join('')}</table>
-        <div class="rowb" style="margin-top:8px">${d.done < d.total ? `<div class="mbtn primary" data-act="nextRace">第${d.done + 1}戦へ　${COURSES[d.done].name}</div>` : `<div class="mbtn primary" data-act="podium">表彰式へ</div>`}</div></div>`,
+        <div class="rowb" style="margin-top:8px">${d.done < d.total ? `<div class="mbtn primary" data-act="nextRace">第${d.done + 1}戦へ　${COURSES[App.gp.courses[d.done]].name}</div>` : `<div class="mbtn primary" data-act="podium">表彰式へ</div>`}</div></div>`,
     podium: d => `<div class="panel"><h2>グランプリ結果</h2>
         <p class="note">${d.rows[0].k.isPlayer ? 'おめでとう！ 優勝です' : `あなたは ${d.rows.findIndex(r => r.k.isPlayer) + 1}位`}</p>
         <table class="res" style="background:rgba(8,16,34,.7);border-radius:12px">${d.rows.map((r, i) => `<tr class="${r.k.isPlayer ? 'me' : ''}"><td>${i + 1}位</td><td>${r.k.name}</td><td class="r">${r.pts}pt</td></tr>`).join('')}</table>
@@ -3002,17 +3146,17 @@ const App = {
       case 'course': this.startTA(+v); break;
       case 'courseSel': this.toMenu('course'); break;
       case 'retryTA': this.startTA(COURSE_IDX); break;
-      case 'gpStart': this.startGP(); break;
+      case 'gpStart': this.startGP(+v || 0); break;
       case 'gpStand': Menu.show('gpStand', this.standings()); break;
       case 'nextRace': this.startRace(this.gp.courses[this.gp.idx]); break;
       case 'podium': this.showPodium(); break;
       case 'title': this.toTitle(); break;
     }
   },
-  startGP() {
+  startGP(cup = 0) {
     this.mode = 'gp';
     setupKarts('gp', Settings.charIdx());
-    this.gp = { courses: COURSES.map((_, i) => i), idx: 0, pts: KARTS.map(() => 0), last: null };
+    this.gp = { cup, courses: cupCourses(cup), idx: 0, pts: KARTS.map(() => 0), last: null };
     this.startRace(this.gp.courses[0]);
   },
   startTA(ci) {
