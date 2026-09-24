@@ -186,7 +186,7 @@ const CFG = {
     maxSpeed: 28, accel: 13, brake: 28, reverseMax: 7, coastDrag: 3.5,
     turnRate: 2.1, turnSpeedRef: 7, highSpeedTurnLoss: 0.35,
     grip: 7, slopeGravity: 6,
-    wallBounce: 0.25, wallSpeedLoss: 0.35, radius: 0.9,
+    wallBounce: 0.15, wallSpeedLoss: 0.18, radius: 0.9, // 壁：跳ね返りと減速（難易度を下げるため緩めた）
     gravity: 22,               // 空中の重力(m/s²)
     stepUp: 0.5,               // これ以下の段差は乗り上げる
     snapDown: 0.3,             // 1ステップでこれ以上路面が下がると空中へ
@@ -214,7 +214,12 @@ const CFG = {
   },
   boost: { maxMul: 1.25, accel: 40, dashTime: 1.0, dashKick: 1.1 },
   sparks: { max: 90, rate: 70, life: 0.35, size: 0.3 },
-  rescue: { descend: 0.6, lift: 0.8, lower: 0.7, leave: 0.8, liftHeight: 5, dropHeight: 3, backSamples: 3, killDepth: 15 },
+  rescue: {
+    descend: 0.35, lift: 0.45, lower: 0.45, leave: 0.6, liftHeight: 4, dropHeight: 2, killDepth: 15, // 演出の各秒数（復帰までの合計1.25秒）
+    backSamples: 18,           // 最後に路面にいた地点から何サンプル戻して降ろすか（約30m：ジャンプの助走分）
+    boost: 1.0,                // 復帰直後のブースト秒数（速度を取り戻しやすくする）
+    reliefAfter: 2, sameSamples: 30, sameTime: 25, reliefAhead: 45, // 同じ場所(30サンプル以内)で25秒以内に2回落ちたら、45サンプル先へ運ぶ
+  },
   collision: { cell: 10 },
   camera: {
     dist: 6.2, height: 2.5, lookAhead: 5, lookHeight: 0.9,
@@ -222,6 +227,7 @@ const CFG = {
     near: 0.1, far: 1600, groundClear: 0.6,
     driftSide: 1.4, sideLerp: 3, boostFov: 8,
   },
+  assist: { strength: 0.35, driftMul: 0.4, edgeMargin: 1.5, look: 6, lookSpeed: 0.35, gain: 2.5 }, // ハンドル補助：道の向きに沿うようにステアを足す
   input: { steerRange: 70, steerDeadzone: 0.06, steerExpo: 1.3, autoAccel: false },
   physics: { step: 1 / 120, maxDt: 1 / 20, maxSteps: 8 },
   race: {
@@ -269,9 +275,9 @@ const CFG = {
     // mistake:1秒あたりのミス発生確率 rubber:プレイヤーより後ろのCPUへの最大上乗せ率
     // catchUp:プレイヤーが負けている時の最大上乗せ率 itemRate:アイテム使用の積極性（大きいほど早く使う） avoid:トラップを避ける確率
     levels: {
-      easy:   { speed: 0.88, skill: 0.07, wobble: 2.4, mistake: 0.10, rubber: 0.10, catchUp: 0.08, itemRate: 0.3, avoid: 0.4 },
-      normal: { speed: 0.95, skill: 0.05, wobble: 1.3, mistake: 0.06, rubber: 0.07, catchUp: 0.05, itemRate: 0.6, avoid: 0.7 },
-      hard:   { speed: 1.0,  skill: 0.03, wobble: 0.5, mistake: 0.02, rubber: 0.04, catchUp: 0.03, itemRate: 1.0, avoid: 0.95 },
+      easy:   { speed: 0.84, skill: 0.07, wobble: 2.4, mistake: 0.14, rubber: 0.06, catchUp: 0.12, itemRate: 0.2, avoid: 0.4 },
+      normal: { speed: 0.92, skill: 0.05, wobble: 1.3, mistake: 0.08, rubber: 0.05, catchUp: 0.08, itemRate: 0.45, avoid: 0.7 },
+      hard:   { speed: 1.0,  skill: 0.03, wobble: 0.5, mistake: 0.02, rubber: 0.04, catchUp: 0.04, itemRate: 1.0, avoid: 0.95 },
     },
     rubberGap: 4,              // プレイヤーとの差がチェックポイントこの数で上乗せ最大
     catchUpGap: 4,             // プレイヤーと1位の差がチェックポイントこの数で上乗せ最大
@@ -479,18 +485,18 @@ const COURSES = [{
   env: { top: 0x12071f, horizon: 0x4a1c3c, hemi: 0.75, dir: 0.85, hemiColor: 0xffb0d0, groundColor: 0x2a1020, dirColor: 0xffc8e0 },
   points: [
     [0, -120, 0, 12, 0], [0, -60, 2, 12, 0], [0, 0, 6, 11, 0], [0, 60, 11, 11, 0], [10, 110, 15, 11, -4],
-    [45, 140, 18, 10, -8], [95, 145, 20, 10, -6], [140, 120, 21, 10, -6], [160, 75, 22, 10, -2], [150, 20, 21, 10, 0],
-    [110, -5, 17, 10, -6], [60, -10, 14, 10, 0], [-50, -12, 14, 10, 0],
+    [45, 140, 18, 10, -8], [95, 145, 20, 10, -6], [140, 120, 21, 10, -6], [160, 75, 22, 10, -2], [157, 38, 22, 10, 0], [150, 2, 21, 10, 0],
+    [110, -14, 17, 10, -6], [60, -12, 14, 10, 0], [-50, -12, 14, 10, 0],
     [-100, -15, 14, 10, 8], [-140, -55, 11.5, 10, 8], [-100, -95, 9, 10, 8], [-60, -55, 6.5, 10, 8],
     [-100, -15, 4, 10, 8], [-140, -55, 1.5, 11, 6], [-140, -100, 0.5, 11, 2], [-120, -140, 0, 11, 6], [-70, -160, 0, 12, 2], [-20, -155, 0, 12, 4],
   ],
-  ramps: [{ at: 8.35, lat: 0, width: 10.4, length: 10, height: 2.4 }],
-  gaps: [{ from: 8.47, to: 8.68 }],
+  ramps: [{ at: 8.3, lat: 0, width: 10.4, length: 10, height: 2.4 }],
+  gaps: [{ from: 8.47, to: 8.8 }],
   edges: [{ from: 5.2, to: 7.4, side: 1, rail: false }],
-  dashes: [{ at: 1.2, lat: 0, width: 5, length: 6 }, { at: 8.1, lat: 0, width: 5, length: 6 }, { at: 12.4, lat: 0, width: 4, length: 6 }, { at: 20.5, lat: 0, width: 5, length: 6 }],
+  dashes: [{ at: 1.2, lat: 0, width: 5, length: 6 }, { at: 8.1, lat: 0, width: 5, length: 6 }, { at: 13.4, lat: 0, width: 4, length: 6 }, { at: 21.5, lat: 0, width: 5, length: 6 }],
   itemBoxes: [
     { at: 2.4, lats: [-3.8, -1.3, 1.3, 3.8] }, { at: 6.3, lats: [-3, 0, 3] },
-    { at: 11.5, lats: [-3, 0, 3] }, { at: 19.5, lats: [-3.8, -1.3, 1.3, 3.8] },
+    { at: 12.5, lats: [-3, 0, 3] }, { at: 20.5, lats: [-3.8, -1.3, 1.3, 3.8] },
   ],
   scenery: { city: { near: 0.55, heights: [25, 110], far: 50, lamps: true, lampColor: 0xff9fd0, lampEvery: 12 }, stars: true, mountainMul: 0, treeMul: 0 },
   colors: {
@@ -1456,6 +1462,7 @@ function stepKart(k, inp, dt) {
   const q = trackQuery(k.x, k.z, k.idx, k.y);
   k.idx = q.idx; k.lat = q.lat; k.u = q.u;
   if (k.grounded && (k.surf === SURF.SAND || k.surf === SURF.ALLEY)) k.scT = CFG.race.shortcutGrace; else if (k.scT > 0) k.scT -= dt;
+  if (k.grounded && (k.surf <= SURF.CURB || k.surf === SURF.RAMP) && !TRACK.gap[q.idx]) k.safeIdx = q.idx; // 復帰地点の候補
   Race.progress(k);
 
   k.speed = k.vx * Math.sin(k.yaw) + k.vz * Math.cos(k.yaw);
@@ -1503,7 +1510,12 @@ const Rescue = {
   start(k) {
     if (k.state !== 'drive') return;
     k.state = 'rescue'; k.vx = k.vz = k.vy = k.speed = 0; k.drifting = false; k.charge = 0; k.boostT = 0; k.trick = false;
-    k.res = { t: 0, phase: 0, from: new THREE.Vector3(k.x, k.y, k.z), toIdx: (Race.cpSample(k.cp) + 2) % TRACK.N, gy: 0 };
+    // 落ちた場所の少し手前へ。同じ場所で続けて落ちた場合は、その先へ運ぶ（救済）
+    const N = TRACK.N, R = CFG.rescue, lf = k.lastFall, same = lf && Math.min(Math.abs(lf.idx - k.safeIdx), N - Math.abs(lf.idx - k.safeIdx)) < R.sameSamples && Race.time - lf.t < R.sameTime;
+    k.lastFall = { idx: k.safeIdx, t: Race.time, n: same ? lf.n + 1 : 1 };
+    const relief = k.lastFall.n >= R.reliefAfter;
+    k.res = { t: 0, phase: 0, from: new THREE.Vector3(k.x, k.y, k.z), toIdx: (k.safeIdx + (relief ? R.reliefAhead : -R.backSamples) + N) % N, gy: 0, relief };
+    if (relief) k.lastFall.n = 0;
     k.ai.stuck = 0;
     if (k.isPlayer && this.onStart) this.onStart();
   },
@@ -1522,11 +1534,11 @@ const Rescue = {
       k.y = r.from.y + ease((t - T1) / R.lift) * R.liftHeight;
       d.position.set(k.x, k.y + hang, k.z);
     } else if (t < T3) {
-      if (r.phase < 1) { r.phase = 1; placeKartAt(k, r.toIdx, 0); k.state = 'rescue'; r.gy = k.y; if (k.isPlayer) Cam.init = false; }
+      if (r.phase < 1) { r.phase = 1; placeKartAt(k, r.toIdx, 0); k.state = 'rescue'; r.gy = k.y; if (r.relief) k.scT = CFG.race.shortcutGrace; if (k.isPlayer) Cam.init = false; }
       k.y = r.gy + R.dropHeight * (1 - ease((t - T2) / R.lower));
       d.position.set(k.x, k.y + hang, k.z);
     } else if (t < T4) {
-      if (r.phase < 2) { r.phase = 2; k.y = r.gy; k.state = 'drive'; k.grounded = true; if (k.isPlayer && this.onEnd) this.onEnd(); }
+      if (r.phase < 2) { r.phase = 2; k.y = r.gy; k.state = 'drive'; k.grounded = true; k.safeIdx = k.idx; giveBoost(k, CFG.rescue.boost, 'dash'); if (k.isPlayer && this.onEnd) this.onEnd(); }
       d.position.y = r.gy + hang + ease((t - T3) / R.leave) * 12;
     } else { k.res = null; d.visible = false; }
   },
@@ -1573,7 +1585,7 @@ const Race = {
       k.state = 'drive'; k.lap = 0; k.cp = this.CPN - 1; k.finished = false; k.finishTime = 0; k.lapStart = 0; k.lapTimes = [];
       k.progress = 0; k.speedMul = 1; k.steer = 0;
       Object.assign(k.inp, { steer: 0, accel: false, brake: false, drift: false, driftEdge: false });
-      k.itemState = 'none'; k.item = -1; k.spinT = 0; k.invT = 0; k.shieldT = 0; k.stallT = 0; k.scT = 0;
+      k.itemState = 'none'; k.item = -1; k.spinT = 0; k.invT = 0; k.shieldT = 0; k.stallT = 0; k.scT = 0; k.safeIdx = k.idx; k.lastFall = null;
     });
     Items.reset();
     this.state = 'count'; this.t = 0; this.time = 0; this.postT = 0; this.finishOrder = [];
@@ -1675,6 +1687,17 @@ function cpuItem(k, dt, d) {
 }
 // ラバーバンド：プレイヤーより後ろのCPUは差に比例して速くなる
 // プレイヤーが1位でない時は、1位との差に比例してプレイヤーが速くなる
+// ハンドル補助：今の横位置を保ったまま、少し先の道の向きへ向けるステアを足す（端に寄りすぎたら内側へ）
+function steerAssist(k, user) {
+  if (!Settings.s.assist || !k.grounded || k.state !== 'drive' || k.speed < 3 || k.spinT > 0) return 0;
+  const A = CFG.assist, { N, P, S, HW } = TRACK;
+  const j = (k.idx + Math.round(A.look + Math.abs(k.speed) * A.lookSpeed)) % N, j3 = j * 3, lim = HW[j] - A.edgeMargin;
+  const lat = Math.max(-lim, Math.min(lim, k.lat));
+  let d = Math.atan2(P[j3] + S[j3] * lat - k.x, P[j3 + 2] + S[j3 + 2] * lat - k.z) - k.yaw;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  const a = Math.max(-1, Math.min(1, -d * A.gain));
+  return a * A.strength * (k.drifting ? A.driftMul : 1) * (1 - 0.5 * Math.min(1, Math.abs(user)));
+}
 function applyRubberBand(ks) {
   const L = AI_LV(), A = CFG.ai;
   let lead = -Infinity;
@@ -2259,7 +2282,7 @@ const LS = {
   del(k) { try { localStorage.removeItem(k); } catch (e) { } },
 };
 const Settings = {
-  s: { difficulty: 'normal', autoAccel: false, gyro: false, gyroInvert: false, gyroSens: 1.0, btnScale: 1.0, layout: {}, charId: 'makyo', bgmVol: 0.6, sfxVol: 0.8, quality: 'mid' },
+  s: { difficulty: 'normal', autoAccel: false, gyro: false, gyroInvert: false, gyroSens: 1.0, btnScale: 1.0, layout: {}, charId: 'makyo', bgmVol: 0.6, sfxVol: 0.8, quality: 'mid', assist: true },
   load() { Object.assign(this.s, LS.get('hk.settings', {})); delete this.s.char; if (!CHARACTERS.some(c => c.id === this.s.charId)) this.s.charId = CHARACTERS[0].id; this.apply(); },
   charIdx() { return Math.max(0, CHARACTERS.findIndex(c => c.id === this.s.charId)); },
   save() { LS.set('hk.settings', this.s); this.apply(); },
@@ -2987,6 +3010,7 @@ const Menu = {
         ${row('CPUの強さ', seg('difficulty', 'easy', 'よわい') + seg('difficulty', 'normal', 'ふつう') + seg('difficulty', 'hard', 'つよい'))}
         ${row('画質', seg('quality', 'low', '低') + seg('quality', 'mid', '中') + seg('quality', 'high', '高'))}
         ${row('オートアクセル', seg('autoAccel', false, 'OFF') + seg('autoAccel', true, 'ON'))}
+        ${row('ハンドル補助', seg('assist', false, 'OFF') + seg('assist', true, 'ON'))}
         ${row('ジャイロ操作', seg('gyro', false, 'OFF', 'gyro') + `<div class="seg ${s.gyro ? 'on' : ''}" data-click="gyroPerm">ON</div>`)}${gyroNote}
         ${row('ジャイロの向きを反転', seg('gyroInvert', false, 'OFF') + seg('gyroInvert', true, 'ON'))}
         ${row('ジャイロ感度', step('gyroSens', 0.1, s.gyroSens.toFixed(1)))}
@@ -3327,7 +3351,7 @@ renderer.setAnimationLoop(now => {
     if (Race.running() && !paused) {
       for (const k of KARTS) {
         if (k.isCPU || k.finished) cpuThink(k, dt);
-        else { const p = k.inp; p.steer = Input.steer; p.accel = Input.accel; p.brake = Input.brake; p.drift = Input.drift; p.driftEdge = p.driftEdge || Input.driftEdge; }
+        else { const p = k.inp; p.steer = Math.max(-1, Math.min(1, Input.steer + steerAssist(k, Input.steer))); p.accel = Input.accel; p.brake = Input.brake; p.drift = Input.drift; p.driftEdge = p.driftEdge || Input.driftEdge; }
       }
       pAI = performance.now() - pt0;
       Input.driftEdge = false;
