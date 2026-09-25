@@ -462,6 +462,13 @@ const COURSES = [{
     { at: 15.4, lats: [-4.5, -1.5, 1.5, 4.5] }, { at: 21.4, lats: [-3.8, -1.3, 1.3, 3.8] },
   ],
   shortcut: { from: 4.3, to: 6.6, side: -1, width: 8, surface: 'alley' },
+  gimmicks: [
+    { type: 'crossing', at: 1.8, speed: 11, wait: 7, kind: 'truck', color: 0x3a7bff, dir: 1 },   // 交差点を横切るトラック
+    { type: 'crossing', at: 12.5, speed: 12, wait: 6, kind: 'truck', color: 0xff8a2a, dir: -1 },
+    { type: 'spinner', at: 8.9, lat: 0, len: 2.8, speed: 1.2, color: 0xff2fb8 },                   // シケインの回転ネオンバー
+    { type: 'spinner', at: 20.6, lat: 0, len: 2.8, speed: -1.0, color: 0x21e6ff },
+    { type: 'ring', at: 17.6, lat: 0, h: 3.2, boost: 1.4, color: 0xffe14a },                        // ジャンプの上の加速リング
+  ],
   scenery: { city: { near: 0.45, heights: [18, 80], far: 44, lamps: true, lampColor: 0xffc27a }, stars: true, mountainMul: 0, treeMul: 0.25, leafHue: 0.33 },
   colors: {
     road1: 0x2c2d36, road2: 0x292a32, curbA: 0x21e6ff, curbB: 0xff2fb8,
@@ -488,6 +495,14 @@ const COURSES = [{
     { at: 11.8, lats: [-3.8, -1.3, 1.3, 3.8] }, { at: 17.0, lats: [-4.5, -1.5, 1.5, 4.5] },
   ],
   shortcut: { from: 6.0, to: 9.0, side: -1, width: 8 },
+  gimmicks: [
+    { type: 'drawbridge', at: 13.27, closed: 5, move: 1.2, open: 3.5 },                            // 運河の跳ね橋
+    { type: 'pendulum', at: 1.4, amp: 5.5, period: 4.2, phase: 0, color: 0x2f7fd0 },                // クレーンで揺れるコンテナ
+    { type: 'pendulum', at: 2.5, amp: 5.5, period: 3.6, phase: 1.5, color: 0xd04a2f },
+    { type: 'wind', from: 5.3, to: 9.8, dir: 1, accel: 5, period: 3.2 },                            // 桟橋の海風
+    { type: 'crossing', at: 15.5, speed: 6, count: 2, wait: 2, kind: 'forklift', color: 0xffc020, dir: 1 }, // コンテナ置き場のフォークリフト
+    { type: 'ring', at: 13.42, lat: 0, h: 3.5, boost: 1.2, color: 0x21e6ff },
+  ],
   scenery: { city: { near: 0.3, heights: [8, 26], far: 36, lamps: true, lampColor: 0xfff0c0 }, stars: true, mountainMul: 0, treeMul: 0 },
   colors: {
     road1: 0x34363e, road2: 0x303238, curbA: 0xffffff, curbB: 0xffb020,
@@ -513,6 +528,13 @@ const COURSES = [{
   itemBoxes: [
     { at: 2.4, lats: [-3.8, -1.3, 1.3, 3.8] }, { at: 6.3, lats: [-3, 0, 3] },
     { at: 12.5, lats: [-3, 0, 3] }, { at: 20.5, lats: [-3.8, -1.3, 1.3, 3.8] },
+  ],
+  gimmicks: [
+    { type: 'traffic', from: 1.2, to: 8.1, speed: 15, count: 4, lanes: [-2.5, 2.5] },            // 一般車（追い越す）
+    { type: 'traffic', from: 8.9, to: 11.2, speed: 15, count: 2, lanes: [-2.5] },
+    { type: 'wind', from: 5.2, to: 7.4, dir: 1, accel: 6, period: 2.6 },                            // 柵のない高所の横風（外側へ）
+    { type: 'cones', from: 11.3, to: 11.9, lat: [0.8, 4.6] },                                       // 工事区間
+    { type: 'ring', at: 8.62, lat: 0, h: 3.5, boost: 1.4, color: 0xff3a5a },
   ],
   scenery: { city: { near: 0.55, heights: [25, 110], far: 50, lamps: true, lampColor: 0xff9fd0, lampEvery: 12 }, stars: true, mountainMul: 0, treeMul: 0 },
   colors: {
@@ -571,7 +593,7 @@ function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let
 // =====================================================================
 // COLLISION：接地用三角形と壁線分をXZグリッドに登録
 // =====================================================================
-const COL = { cell: CFG.collision.cell, tri: [], triType: [], grid: new Map(), seg: [], segGrid: new Map(), triCount: 0 };
+const COL = { dynOn: [1, 1], triDyn: [], cell: CFG.collision.cell, tri: [], triType: [], grid: new Map(), seg: [], segGrid: new Map(), triCount: 0 };
 const cellKey = (ix, iz) => (ix + 32768) * 65536 + (iz + 32768);
 function gridInsert(grid, id, x0, z0, x1, z1) {
   const c = COL.cell;
@@ -580,7 +602,7 @@ function gridInsert(grid, id, x0, z0, x1, z1) {
       const k = cellKey(ix, iz); let l = grid.get(k); if (!l) grid.set(k, l = []); l.push(id);
     }
 }
-function colAddTri(a, b, c, type) {
+function colAddTri(a, b, c, type, dyn = 0) {
   const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
   let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
   const l = Math.hypot(nx, ny, nz); if (l < 1e-9) return;
@@ -589,7 +611,7 @@ function colAddTri(a, b, c, type) {
   if (ny < 0.2) return; // 垂直面は接地対象外
   const id = COL.triCount++;
   COL.tri.push(a[0], a[2], b[0], b[2], c[0], c[2], nx, ny, nz, a[0], a[1], a[2]);
-  COL.triType.push(type);
+  COL.triType.push(type); COL.triDyn.push(dyn);
   gridInsert(COL.grid, id, Math.min(a[0], b[0], c[0]), Math.min(a[2], b[2], c[2]), Math.max(a[0], b[0], c[0]), Math.max(a[2], b[2], c[2]));
 }
 function colAddSeg(x1, z1, x2, z2, yb, yt) {
@@ -604,6 +626,7 @@ function groundAt(x, z, yMax, out) {
   let best = -Infinity, bi = -1;
   if (l) for (let n = 0; n < l.length; n++) {
     const t = l[n], o = t * 12;
+    const dg = COL.triDyn[t]; if (dg && !COL.dynOn[dg]) continue; // 跳ね橋が上がっている間は路面なし
     const x0 = D[o], z0 = D[o + 1], x1 = D[o + 2], z1 = D[o + 3], x2 = D[o + 4], z2 = D[o + 5];
     const d1 = (x - x1) * (z0 - z1) - (x0 - x1) * (z - z1);
     const d2 = (x - x2) * (z1 - z2) - (x1 - x2) * (z - z2);
@@ -739,9 +762,15 @@ function buildTrackMeshes(tr) {
     if (i < 2) return [cc(((q + i) & 1) ? C.lineA : C.lineB), SURF.ROAD];
     return [cc((Math.floor(i / TR.roadBand) & 1) ? C.road1 : C.road2), SURF.ROAD];
   };
+  const DB = (def.gimmicks || []).find(g => g.type === 'drawbridge'), dbPos = [], dbCol = [];
   for (let i = 0; i < N; i++) {
     const j = (i + 1) % N;
-    if (gap[i]) continue; // 路面の切れ目
+    if (gap[i]) { // 路面の切れ目（跳ね橋のコースでは、動く床をここに作る）
+      if (DB) { for (let q = 1; q < 11; q++) { const [col] = quadInfo(i, q), v00 = vv(i, q), v01 = vv(i, q + 1), v10 = vv(j, q), v11 = vv(j, q + 1);
+        for (const v of [v00, v01, v10, v01, v11, v10]) { dbPos.push(v[0], v[1], v[2]); dbCol.push(col.r, col.g, col.b); }
+        colAddTri(v00, v01, v10, q > 2 && q < 9 ? SURF.ROAD : SURF.CURB, 1); colAddTri(v01, v11, v10, q > 2 && q < 9 ? SURF.ROAD : SURF.CURB, 1); } }
+      continue;
+    }
     if (bridge[i] && bridge[j]) quad(vv(i, 12), vv(i, 0), vv(j, 12), vv(j, 0), cc(C.deck), -1); // 橋の裏
     for (let q = 0; q < COLS - 1; q++) {
       const [col, type] = quadInfo(i, q);
@@ -779,6 +808,20 @@ function buildTrackMeshes(tr) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(clr, 3));
   g.computeVertexNormals();
+  DRAWBRIDGE.leaf = null; DRAWBRIDGE.lamps = [];
+  if (DB && dbPos.length) { // 跳ね橋の床：切れ目の手前の端を軸に回転させる
+    let g0 = 0; while (!gap[g0] || gap[(g0 - 1 + N) % N]) g0 = (g0 + 1) % N;
+    const pv = [P[g0 * 3], P[g0 * 3 + 1], P[g0 * 3 + 2]];
+    for (let k = 0; k < dbPos.length; k += 3) { dbPos[k] -= pv[0]; dbPos[k + 1] -= pv[1]; dbPos[k + 2] -= pv[2]; }
+    const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(dbPos, 3)); dg.setAttribute('color', new THREE.Float32BufferAttribute(dbCol, 3)); dg.computeVertexNormals();
+    const leaf = new THREE.Group(); leaf.position.set(pv[0], pv[1], pv[2]);
+    leaf.add(new THREE.Mesh(dg, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide })));
+    const sl = Math.hypot(S[g0 * 3], S[g0 * 3 + 2]); DRAWBRIDGE.axis.set(S[g0 * 3] / sl, 0, S[g0 * 3 + 2] / sl);
+    group.add(leaf); DRAWBRIDGE.leaf = leaf;
+    for (const sg of [-1, 1]) { const l = sg * (HW[g0] + TR.shoulder + 0.6), lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff2020 }));
+      lamp.position.set(P[g0 * 3] + S[g0 * 3] * l, P[g0 * 3 + 1] + 3, P[g0 * 3 + 2] + S[g0 * 3 + 2] * l); group.add(lamp); DRAWBRIDGE.lamps.push(lamp);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 3, 6), new THREE.MeshLambertMaterial({ color: 0x444444 })); post.position.set(lamp.position.x, lamp.position.y - 1.5, lamp.position.z); group.add(post); }
+  }
   const road = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
   road.receiveShadow = true;
   group.add(road);
@@ -1032,7 +1075,7 @@ function disposeTree(o) {
 function loadCourse(i) {
   if (COURSE_IDX === i) return;
   disposeTree(courseGroup); courseGroup.clear();
-  COL.tri.length = 0; COL.triType.length = 0; COL.grid.clear(); COL.seg.length = 0; COL.segGrid.clear(); COL.triCount = 0;
+  COL.tri.length = 0; COL.triType.length = 0; COL.triDyn.length = 0; COL.dynOn[1] = 1; COL.grid.clear(); COL.seg.length = 0; COL.segGrid.clear(); COL.triCount = 0;
   const env = COURSES[i].env || {};
   CFG.track.groundY = COURSES[i].groundY !== undefined ? COURSES[i].groundY : -2.5;
   CFG.sky.top = env.top || 0x3f8fe0; CFG.sky.horizon = env.horizon || 0xd2ebff; CFG.sky.fog = env.horizon || 0xd2ebff;
@@ -1044,6 +1087,7 @@ function loadCourse(i) {
   courseGroup.add(buildTrackMeshes(TRACK), buildScenery(TRACK));
   DASH_ZONES = buildDashZones(TRACK); DASH = buildDashMesh(TRACK, DASH_ZONES); courseGroup.add(DASH.mesh);
   LINE = buildLine();
+  Gimmicks.build(courseGroup);
   COURSE_IDX = i;
   if (typeof onCourseLoaded === 'function') onCourseLoaded();
 }
@@ -1686,6 +1730,7 @@ function cpuThink(k, dt) {
   const wob = Math.sin(ai.t * ai.wobF * Math.PI * 2 + ai.ph) * L.wobble * (1 - 0.4 * ai.skill);
   const lim = HW[j] - 1.2;
   let lat = Math.max(-lim, Math.min(lim, LINE[j] * ai.lineMix + ai.offset + wob + (ai.miss > 0 ? ai.missSteer : 0)));
+  if (Gimmicks.list.length) lat = Gimmicks.avoid(k, lat, lim);
   // 前方のトラップを避ける（難易度に応じた確率で気付く）
   const IC = CFG.items.cpu;
   for (const tr of Items.traps) {
@@ -1832,7 +1877,8 @@ const FX = (() => {
       if (e >= 1) { r.on = false; r.mesh.visible = false; }
     }
   }
-  return { group, burst, trail, ring, update, onEvent: null };
+  const streak = (x, y, z, vx, vy, vz, hex, life = 0.4) => emit(small, x, y, z, vx, vy, vz, hex, life, 0);
+  return { group, burst, trail, ring, streak, update, onEvent: null };
 })();
 
 // =====================================================================
@@ -2208,6 +2254,177 @@ const Skills = (() => {
   };
   return api;
 })();
+
+// =====================================================================
+// GIMMICKS：コースの仕掛け（横断車両・回転バー・振り子コンテナ・一般車・加速リング・横風・工事コーン・跳ね橋）
+// コースデータの gimmicks に並べると、読み込み時に作られる
+// =====================================================================
+const Gimmicks = (() => {
+  const api = { list: [], t: 0, alertText: '' };
+  const V3 = THREE.Vector3;
+  const basic = new THREE.MeshBasicMaterial({ vertexColors: true });
+  function tp(f, lat, out = {}) { // サンプル番号（小数可）と横位置からワールド座標
+    const { N, P, S, T } = TRACK, fi = Math.floor(f), a = ((fi % N) + N) % N, b = (a + 1) % N, u = f - fi, a3 = a * 3, b3 = b * 3;
+    out.x = P[a3] + (P[b3] - P[a3]) * u + S[a3] * lat; out.y = P[a3 + 1] + (P[b3 + 1] - P[a3 + 1]) * u + S[a3 + 1] * lat; out.z = P[a3 + 2] + (P[b3 + 2] - P[a3 + 2]) * u + S[a3 + 2] * lat;
+    const sl = Math.hypot(S[a3], S[a3 + 2]); out.sx = S[a3] / sl; out.sz = S[a3 + 2] / sl; out.tx = T[a3]; out.tz = T[a3 + 2]; out.yaw = Math.atan2(T[a3], T[a3 + 2]); out.i = a;
+    return out;
+  }
+  const idxOf = at => TRACK.sampleAt(at);
+  function vehicle(kind, color) { // トラック・フォークリフト・一般車の見た目（車体＋ライト）
+    const g = new THREE.Group(), d = 0x222228, parts = [], lights = [];
+    if (kind === 'truck') { parts.push(part(B3(2.4, 2.4, 5.2), color, 0, 1.7, -0.8), part(B3(2.3, 1.9, 1.8), 0xdedede, 0, 1.4, 2.6)); lights.push(part(B3(0.4, 0.3, 0.1), 0xfff2b0, -0.8, 1.0, 3.55), part(B3(0.4, 0.3, 0.1), 0xfff2b0, 0.8, 1.0, 3.55), part(B3(0.3, 0.3, 0.1), 0xff3030, -1.0, 0.9, -3.45), part(B3(0.3, 0.3, 0.1), 0xff3030, 1.0, 0.9, -3.45)); }
+    else if (kind === 'forklift') { parts.push(part(B3(1.6, 1.2, 2.4), color, 0, 0.9, 0), part(B3(1.4, 1.2, 0.1), d, 0, 2.0, -0.2), part(B3(0.1, 2.6, 0.1), d, -0.6, 1.8, 1.25), part(B3(0.1, 2.6, 0.1), d, 0.6, 1.8, 1.25), part(B3(1.2, 0.08, 1.2), 0x888888, 0, 0.3, 1.9)); lights.push(part(B3(0.3, 0.3, 0.1), 0xffc020, 0, 2.7, -0.2)); }
+    else { parts.push(part(B3(1.8, 0.8, 4.2), color, 0, 0.7, 0), part(B3(1.6, 0.7, 2.2), color, 0, 1.4, -0.3), part(B3(1.5, 0.5, 1.9), 0x223044, 0, 1.45, -0.3)); lights.push(part(B3(0.4, 0.2, 0.1), 0xfff2b0, -0.6, 0.8, 2.12), part(B3(0.4, 0.2, 0.1), 0xfff2b0, 0.6, 0.8, 2.12), part(B3(0.4, 0.2, 0.1), 0xff2a2a, -0.6, 0.8, -2.12), part(B3(0.4, 0.2, 0.1), 0xff2a2a, 0.6, 0.8, -2.12)); }
+    for (const x of [-0.9, 0.9]) for (const z of kind === 'truck' ? [-2.5, 0.2, 2.6] : [-1.3, 1.3]) parts.push(part(new THREE.CylinderGeometry(0.42, 0.42, 0.35, 10), d, x, 0.42, z, 0, 0, Math.PI / 2));
+    g.add(new THREE.Mesh(mergeParts(parts), VCMAT), new THREE.Mesh(mergeParts(lights), basic));
+    return g;
+  }
+  const _o = {};
+  const builders = {
+    crossing(G, grp) { // 交差点を横切る車両（一方向に流れ、端で消えて反対側から出る）
+      const i0 = idxOf(G.at), base = tp(i0, 0), L = TRACK.HW[i0] + CFG.track.shoulder + 5, span = 2 * L + (G.wait || 6) * G.speed, n = G.count || 1;
+      const cars = []; for (let k = 0; k < n; k++) { const m = vehicle(G.kind || 'truck', G.color || 0x3a7bff); grp.add(m); cars.push({ m, off: k * span / n }); }
+      return { G, circles: [], spin: G.spin ?? 0.9, bounce: 0.4, update(t) {
+        this.circles.length = 0;
+        for (const c of cars) { const s = (t * G.speed + c.off) % span - L, lat = s * (G.dir || 1), p = tp(i0, lat, _o);
+          c.m.visible = Math.abs(s) <= L; if (!c.m.visible) continue;
+          const yaw = Math.atan2(p.sx * (G.dir || 1), p.sz * (G.dir || 1)); c.m.position.set(p.x, p.y, p.z); c.m.rotation.y = yaw;
+          const fx = Math.sin(yaw), fz = Math.cos(yaw), vx = fx * G.speed, vz = fz * G.speed, len = G.kind === 'forklift' ? [0] : [-2, 0.5, 2.6];
+          for (const d of len) this.circles.push({ x: p.x + fx * d, y: p.y, z: p.z + fz * d, r: G.kind === 'forklift' ? 1.3 : 1.35, vx, vz }); } } };
+    },
+    spinner(G, grp) { // 回転するネオンのバー
+      const i0 = idxOf(G.at), p0 = tp(i0, G.lat || 0), L = G.len || 5, bar = new THREE.Group();
+      bar.add(new THREE.Mesh(mergeParts([part(B3(L * 2, 0.45, 0.45), G.color || 0xff2fb8, 0, 0, 0), part(B3(0.7, 0.7, 0.7), 0xffffff, 0, 0, 0)]), basic));
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 1.2, 8), new THREE.MeshLambertMaterial({ color: 0x555a66 }));
+      bar.position.set(p0.x, p0.y + 0.9, p0.z); pole.position.set(p0.x, p0.y + 0.3, p0.z); grp.add(bar, pole);
+      return { G, circles: [], spin: G.spin ?? 0.8, bounce: 0.6, update(t) {
+        const a = t * (G.speed || 1.4); bar.rotation.y = a; this.circles.length = 0;
+        const ca = Math.cos(a), sa = Math.sin(a), w = (G.speed || 1.4);
+        for (let d = -L; d <= L + 0.01; d += 1.2) { const x = p0.x + ca * d, z = p0.z - sa * d; this.circles.push({ x, y: p0.y, z, r: 0.7, vx: -sa * d * w, vz: -ca * d * w }); } } };
+    },
+    pendulum(G, grp) { // クレーンから吊られて左右に揺れるコンテナ
+      const i0 = idxOf(G.at), p0 = tp(i0, 0), hw = TRACK.HW[i0] + CFG.track.shoulder, H = 13, amp = G.amp || hw;
+      const frame = new THREE.Mesh(mergeParts([part(B3(0.8, H, 0.8), 0xffb020, -(hw + 1.5), H / 2, 0), part(B3(0.8, H, 0.8), 0xffb020, hw + 1.5, H / 2, 0), part(B3(2 * hw + 4, 0.9, 1.2), 0xffb020, 0, H, 0)]), VCMAT);
+      frame.position.set(p0.x, p0.y, p0.z); frame.rotation.y = Math.atan2(p0.sx, p0.sz) - Math.PI / 2; grp.add(frame);
+      const box = new THREE.Mesh(mergeParts([part(B3(2.5, 2.6, 6), G.color || 0x2f7fd0, 0, 0, 0), part(B3(2.56, 0.12, 6.06), 0xdddddd, 0, 1.2, 0)]), VCMAT);
+      const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 4), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+      grp.add(box, cable);
+      return { G, circles: [], spin: G.spin ?? 0.9, bounce: 0.5, update(t) {
+        const w = Math.PI * 2 / (G.period || 4), lat = amp * Math.sin(t * w + (G.phase || 0)), p = tp(i0, lat, _o), vlat = amp * w * Math.cos(t * w + (G.phase || 0));
+        const lift = 0.8 + 1.4 * (lat / amp) ** 2; // 端ほど高く上がる
+        box.position.set(p.x, p.y + lift + 1.3, p.z); box.rotation.y = p.yaw;
+        const cy = p.y + lift + 2.6, top = p0.y + H; cable.position.set(p.x, (cy + top) / 2, p.z); cable.scale.set(1, top - cy, 1);
+        this.circles.length = 0; for (const d of [-1.8, 1.8]) this.circles.push({ x: p.x + p.tx * d, y: p.y + (lift > 2.2 ? 9 : 0), z: p.z + p.tz * d, r: 1.6, vx: p.sx * vlat, vz: p.sz * vlat }); } };
+    },
+    traffic(G, grp) { // 同じ向きに走る一般車（追い越す）
+      const f0 = idxOf(G.from), f1 = idxOf(G.to), N = TRACK.N, len = ((f1 - f0) + N) % N, spm = CFG.track.samplesPerMeter, n = G.count || 5;
+      const cols = [0xd8d8d8, 0x2a2a2a, 0xc0392b, 0x2e6fd8, 0xe0b020, 0x3aa060], cars = [];
+      for (let k = 0; k < n; k++) { const m = vehicle('car', cols[k % cols.length]); grp.add(m); cars.push({ m, off: k * len / n, lat: (G.lanes || [-2.5, 2.5])[k % (G.lanes || [-2.5, 2.5]).length] }); }
+      return { G, circles: [], spin: 0, slow: 0.35, bounce: 0.3, cars, update(t) {
+        this.circles.length = 0;
+        for (const c of cars) { const f = f0 + (t * G.speed * spm + c.off) % len, p = tp(f, c.lat, _o); c.f = f;
+          c.m.position.set(p.x, p.y, p.z); c.m.rotation.y = p.yaw; const vx = Math.sin(p.yaw) * G.speed, vz = Math.cos(p.yaw) * G.speed;
+          for (const d of [-1.2, 1.2]) this.circles.push({ x: p.x + p.tx * d, y: p.y, z: p.z + p.tz * d, r: 1.2, vx, vz, lat: c.lat, f }); } } };
+    },
+    ring(G, grp) { // 通り抜けると加速するリング
+      const i0 = idxOf(G.at), p = tp(i0, G.lat || 0), m = new THREE.Mesh(new THREE.TorusGeometry(G.r || 2.8, 0.28, 8, 32), new THREE.MeshBasicMaterial({ color: G.color || 0x21e6ff }));
+      m.position.set(p.x, p.y + (G.h || 3), p.z); m.rotation.y = p.yaw; grp.add(m);
+      return { G, circles: [], ring: { x: p.x, y: p.y + (G.h || 3), z: p.z, r: (G.r || 2.8) + 0.6 }, update(t) { m.rotation.z = t * 2; m.scale.setScalar(1 + Math.sin(t * 6) * 0.05); } };
+    },
+    cones(G, grp) { // 工事区間：コーンで片側をふさぐ
+      const a = idxOf(G.from), b = idxOf(G.to), N = TRACK.N, circles = [], pts = [];
+      for (let i = a; i !== b; i = (i + 2) % N) for (let l = G.lat[0]; l <= G.lat[1] + 0.01; l += 1.4) { const p = tp(i, l); pts.push([p.x, p.y, p.z]); circles.push({ x: p.x, y: p.y, z: p.z, r: 0.45, vx: 0, vz: 0 }); }
+      const geo = mergeParts([part(new THREE.ConeGeometry(0.35, 0.9, 8), 0xff6a10, 0, 0.45, 0), part(new THREE.CylinderGeometry(0.22, 0.26, 0.12, 8), 0xffffff, 0, 0.5, 0), part(B3(0.8, 0.06, 0.8), 0x222222, 0, 0.03, 0)]);
+      const im = new THREE.InstancedMesh(geo, VCMAT, Math.max(1, pts.length)), mm = new THREE.Matrix4();
+      pts.forEach((p, k) => { mm.makeTranslation(p[0], p[1], p[2]); im.setMatrixAt(k, mm); }); grp.add(im);
+      const s0 = tp(a, (G.lat[0] + G.lat[1]) / 2), sign = new THREE.Mesh(mergeParts([part(B3(2.4, 1.4, 0.15), 0x222222, 0, 1.5, 0), part(B3(1.6, 0.35, 0.18), 0xffb020, 0, 1.5, 0), part(B3(0.1, 1, 0.1), 0x888888, 0, 0.5, 0)]), basic);
+      sign.position.set(s0.x, s0.y, s0.z); sign.rotation.y = s0.yaw + Math.PI; grp.add(sign);
+      return { G, circles, spin: 0, slow: 0.25, bounce: 0.6, update() { } };
+    },
+    wind(G) { // 横風区間（強弱をくり返す）
+      return { G, circles: [], wind: { a: idxOf(G.from), b: idxOf(G.to) }, update() { } };
+    },
+    drawbridge(G) { // 跳ね橋：閉じている間だけ渡れる（開いている間はジャンプ台で飛び越える）
+      return { G, circles: [], bridge: true, update(t) {
+        const P = G.closed + G.move + G.open + G.move, c = t % P;
+        let e = c < G.closed ? 0 : c < G.closed + G.move ? (c - G.closed) / G.move : c < G.closed + G.move + G.open ? 1 : 1 - (c - G.closed - G.move - G.open) / G.move;
+        this.state = c < G.closed ? 'closed' : e >= 1 ? 'open' : 'moving'; this.e = e;
+        COL.dynOn[1] = e < 0.05 ? 1 : 0;
+        if (DRAWBRIDGE.leaf) DRAWBRIDGE.leaf.quaternion.setFromAxisAngle(DRAWBRIDGE.axis, -e * 1.25);
+        for (const L of DRAWBRIDGE.lamps) L.visible = this.state !== 'closed' || (c > G.closed - 1.5 && Math.floor(t * 6) % 2 === 0) ? Math.floor(t * 6) % 2 === 0 : false;
+      } };
+    },
+  };
+  api.build = grp => {
+    api.list = []; api.t = 0;
+    for (const G of TRACK.def.gimmicks || []) { const b = builders[G.type]; if (b) api.list.push(b(G, grp)); }
+    api.update(0);
+  };
+  api.update = t => { for (const o of api.list) o.update(t); };
+  api.frame = (dt, running) => {
+    api.t += dt; api.update(api.t);
+    const P = PLAYER; api.alertText = '';
+    if (!P || !running) return;
+    for (const o of api.list) {
+      if (o.wind && inRange(P.idx, o.wind.a, o.wind.b)) {
+        api.alertText = '💨 横風注意！';
+        const s = tp(P.idx, 0, _o), dir = o.G.dir || 1; // 風の粒子
+        for (let n = 0; n < 2; n++) { const ahead = 8 + Math.random() * 25, lat = (Math.random() - 0.5) * 16; const q = tp(P.idx + ahead * CFG.track.samplesPerMeter, lat, {});
+          FX.streak(q.x - q.sx * dir * 6, q.y + 0.5 + Math.random() * 3, q.z - q.sz * dir * 6, q.sx * dir * 30, 0, q.sz * dir * 30, 0xcfe8ff, 0.4); }
+      }
+      if (o.bridge && o.state !== 'closed') { const gi = TRACK.sampleAt(o.G.at), ahead = (gi - P.idx + TRACK.N) % TRACK.N; if (ahead > 0 && ahead < 110) api.alertText = o.state === 'open' ? '⚠ 跳ね橋が上がっている！ジャンプで越えろ' : '⚠ 跳ね橋が動いている！'; }
+    }
+  };
+  const inRange = (i, a, b) => a <= b ? i >= a && i <= b : i >= a || i <= b;
+  api.step = dt => { // 物理ステップごと：当たり判定・横風・リング
+    for (const o of api.list) {
+      for (const k of Race.karts) {
+        if (k.state !== 'drive') continue;
+        if (o.wind && inRange(k.idx, o.wind.a, o.wind.b)) {
+          const g = o.G.accel * (0.45 + 0.55 * Math.sin(api.t * Math.PI * 2 / (o.G.period || 3)) ** 2), s = tp(k.idx, 0, _o), dir = o.G.dir || 1;
+          k.vx += s.sx * dir * g * dt; k.vz += s.sz * dir * g * dt;
+        }
+        if (o.ring) { const R = o.ring; if ((k.ringCd || 0) <= 0 && Math.hypot(k.x - R.x, k.z - R.z) < R.r && Math.abs(k.y + 0.6 - R.y) < R.r * 0.7) {
+          k.ringCd = 1.5; giveBoost(k, o.G.boost || 1.3, 'dash'); FX.burst(R.x, R.y, R.z, [o.G.color || 0x21e6ff, 0xffffff], 24, 8, 0.5, true, 0); FX.ring(k.x, k.y, k.z, o.G.color || 0x21e6ff, 4, 0.4); if (api.onEvent) api.onEvent('ring', k); } }
+        if (k.shieldT > 0 || k.knockT > 0) continue; // バリア・突進中は仕掛けをすり抜ける
+        for (const c of o.circles) {
+          if (Math.abs(k.y - c.y) > 2) continue;
+          const dx = k.x - c.x, dz = k.z - c.z, rr = c.r + CFG.kart.radius, d2 = dx * dx + dz * dz;
+          if (d2 >= rr * rr) continue;
+          const d = Math.sqrt(d2) || 1e-3, nx = dx / d, nz = dz / d;
+          k.x += nx * (rr - d); k.z += nz * (rr - d);
+          const rel = (k.vx - c.vx) * nx + (k.vz - c.vz) * nz;
+          if (rel < 0) { k.vx -= nx * rel * (1 + o.bounce); k.vz -= nz * rel * (1 + o.bounce); }
+          if ((k.obsCd || 0) <= 0) {
+            k.obsCd = 0.8;
+            if (o.spin) Items.hitKart(k, o.spin, 'obstacle', null);
+            else if (o.slow) { k.vx *= 1 - o.slow; k.vz *= 1 - o.slow; if (api.onEvent) api.onEvent('bump', k); }
+          }
+          break;
+        }
+      }
+    }
+    for (const k of Race.karts) { if (k.ringCd > 0) k.ringCd -= dt; if (k.obsCd > 0) k.obsCd -= dt; }
+  };
+  api.avoid = (k, lat, lim) => { // CPU：前方の障害物を避けるよう横位置をずらす
+    const N = TRACK.N;
+    for (const o of api.list) if (o.G.type === 'spinner') { // 回転バーは回る範囲の外側を通る
+      const i0 = TRACK.sampleAt(o.G.at), ahead = (i0 - k.idx + N) % N;
+      if (ahead > 2 && ahead < 45) { const edge = (o.G.lat || 0) + (o.G.len || 5) + 1.15, lim2 = TRACK.HW[i0] - 0.8; lat = (lat >= (o.G.lat || 0) ? 1 : -1) * Math.min(lim2, edge); return lat; }
+    }
+    for (const o of api.list) if (o.G.type !== 'spinner') for (const c of o.circles) {
+      if (c.r < 0.5 && o.G.type !== 'cones') continue;
+      const q = trackQuery(c.x, c.z, k.idx, c.y), ahead = (q.idx - k.idx + N) % N;
+      if (ahead < 4 || ahead > 40 || Math.abs(q.lat - lat) > c.r + 2.2) continue;
+      const a1 = q.lat + c.r + 2.4, a2 = q.lat - c.r - 2.4;
+      lat = (a1 <= lim && (Math.abs(a1 - lat) < Math.abs(a2 - lat) || a2 < -lim)) ? a1 : a2;
+      lat = Math.max(-lim, Math.min(lim, lat));
+    }
+    return lat;
+  };
+  return api;
+})();
+const DRAWBRIDGE = { leaf: null, axis: new THREE.Vector3(), lamps: [] };
 
 // =====================================================================
 // VISUAL
@@ -3166,7 +3383,7 @@ FX.onEvent = (type, k, owner, src) => {
   if (type === 'hit') { if (k.isPlayer) Sound.play('hit'); else Sound.playAt('hitOther', k.x, k.z, owner && owner.isPlayer ? 1.5 : 1); }
   if (type === 'block') Sound.playAt('block', k.x, k.z, 1.2);
   if (type === 'strike') Sound.playAt('strikeFire', k.x, k.z, 2.5);
-  const F = CFG.fx, N = CFG.items.names, SRC = { shot: N[0], homing: N[1], trap: N[2], shield: N[4], strike: N[5] };
+  const F = CFG.fx, N = CFG.items.names, SRC = { shot: N[0], homing: N[1], trap: N[2], shield: N[4], strike: N[5], obstacle: '障害物' };
   if (type === 'hit' && k.isPlayer) { UI.vigA = F.vignette; Cam.shake = Math.max(Cam.shake, F.shake.hit); Screen.banner(`${SRC[src] || ''}で被弾！`, '#ff6b6b'); }
   else if (type === 'hit' && owner && owner.isPlayer) Screen.banner(`ヒット！ ${k.name}`, '#ffe14a');
   else if (type === 'block' && k.isPlayer) Screen.banner('バリアで防いだ！', '#7fe8ff');
@@ -3228,6 +3445,7 @@ function updateHUD(dt) {
   }
   let al = '';
   if (Items.strikes.some(s => s.tgt === p && !s.fired)) al = '⚠ サテライトロックオン！';
+  else if (Gimmicks.alertText) al = Gimmicks.alertText;
   else if (Items.homings.some(h => h.tgt === p)) al = '⚠ 追跡ドローン接近！';
   if (UI.lastAlert !== al) { UI.alert.textContent = al; UI.alert.style.display = al ? 'block' : 'none'; UI.lastAlert = al; }
   const i3 = p.idx * 3;
@@ -3646,6 +3864,7 @@ renderer.setAnimationLoop(now => {
         for (const k of KARTS) stepKart(k, k.inp, CFG.physics.step);
         collideKarts(KARTS);
         Items.step(CFG.physics.step);
+        Gimmicks.step(CFG.physics.step);
         acc -= CFG.physics.step; n++;
       }
       if (n === CFG.physics.maxSteps) acc = 0;
@@ -3659,6 +3878,7 @@ renderer.setAnimationLoop(now => {
     pt1 = performance.now(); pPhys = pt1 - pt0 - pAI;
     Input.itemEdge = false; Input.skillEdge = false;
     Skills.frame(Race.running() && !paused ? dt : 0, now / 1000);
+    Gimmicks.frame(paused ? 0 : dt, Race.running());
     KARTS.forEach(updateKartVisual);
     WHEEL.front.instanceMatrix.needsUpdate = WHEEL.rear.instanceMatrix.needsUpdate = SHADOW.instanceMatrix.needsUpdate = true;
     Sparks.update(paused ? 0 : dt, KARTS);
