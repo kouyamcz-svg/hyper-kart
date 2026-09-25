@@ -312,7 +312,7 @@ const CFG = {
     cpuDelay: [0.5, 2.5], cpuForce: 10, slowMul: 0.72,            // CPUの発動待ち・強制発動、減速系の最高速倍率
     p: {
       intimidate: { time: 4, range: 16 }, bigjump: { up: 12, boost: 1.2, inv: 1.3 }, flash: { range: 45, time: 1.6 },
-      tsuppari: { time: 3 }, turbo: { time: 2.2 }, reflect: { time: 6 }, dragon: { time: 2 }, smoke: { time: 1.5, life: 5, radius: 5 },
+      tsuppari: { time: 3 }, turbo: { time: 2.2 }, reflect: { time: 6 }, dragon: { time: 2 }, smoke: { time: 2, life: 6, radius: 6, boost: 1.5, blind: 0.6 },
       lonewolf: { base: 1.0, perRank: 0.36 }, artillery: { delay: 1.2, radius: 3.5, stun: 0.7 }, volley: { spread: 0.22 },
     },
   },
@@ -2092,7 +2092,7 @@ const SKILLS = {
   turbo:      { name: 'フルスロットル', icon: '🔥', color: 0xff8a2a, desc: 'その場で段階3のミニターボより長い2.2秒の加速' },
   reflect:    { name: 'つるピカ反射', icon: '✨', color: 0xfff27a, desc: '6秒間、飛んできた弾と追跡ドローンを撃った相手へ跳ね返す' },
   dragon:     { name: '龍の舞', icon: '🐉', color: 0xff3a3a, desc: '2秒間、無敵で突進し、触れたカートを吹き飛ばす' },
-  smoke:      { name: '煙幕', icon: '💨', color: 0x9a9a9a, desc: '後ろに煙を残す。煙に入ったカートは減速し前が見えにくくなる' },
+  smoke:      { name: '煙幕', icon: '💨', color: 0x9a9a9a, desc: '煙を吹かして1.5秒加速し、後ろに煙を残す。煙に入ったカートは減速し、前が見えずハンドルが乱れる' },
   lonewolf:   { name: '一匹狼の追い上げ', icon: '🐺', color: 0x5aa0ff, desc: '順位が低いほど長く加速（1位1秒〜8位約3.5秒）' },
   artillery:  { name: '砲撃支援', icon: '💥', color: 0xff5a2a, desc: '自分より上位の3台に砲撃。1.2秒後に着弾してスピン' },
   volley:     { name: '総攻撃', icon: '👊', color: 0xff8c1a, desc: '5人がはねかえり弾を扇形に一斉発射' },
@@ -2122,7 +2122,7 @@ const Skills = (() => {
     else if (id === 'turbo') giveBoost(k, P.turbo.time, 'skill');
     else if (id === 'reflect') k.reflectT = P.reflect.time;
     else if (id === 'dragon') { k.skillT = P.dragon.time; k.knockT = P.dragon.time; k.invT = Math.max(k.invT, P.dragon.time); giveBoost(k, P.dragon.time, 'skill'); }
-    else if (id === 'smoke') { k.skillT = P.smoke.time; k.smokeN = 0; }
+    else if (id === 'smoke') { k.skillT = P.smoke.time; k.smokeN = 0; giveBoost(k, P.smoke.boost, 'skill'); } // 煙を吹かして加速
     else if (id === 'lonewolf') giveBoost(k, P.lonewolf.base + P.lonewolf.perRank * (k.rank - 1), 'skill');
     else if (id === 'artillery') {
       const tg = [...Race.karts].filter(o => o !== k && !o.finished && o.rank < k.rank).sort((a, b) => b.rank - a.rank).slice(0, 3);
@@ -2152,7 +2152,9 @@ const Skills = (() => {
     for (let i = clouds.length - 1; i >= 0; i--) {
       const c = clouds[i]; c.t += dt; const life = P.smoke.life, r = P.smoke.radius * Math.min(1, 0.4 + c.t * 2);
       c.mesh.position.set(c.x, c.y, c.z); c.mesh.scale.set(r, r * 0.6, r); c.mesh.material.opacity = 0.5;
-      for (const o of Race.karts) if (o !== c.owner && o.state === 'drive' && Math.hypot(o.x - c.x, o.z - c.z) < r && Math.abs(o.y + 1 - c.y) < 3) { o.slowT = Math.max(o.slowT || 0, 0.3); o.smokeT = 0.3; }
+      for (const o of Race.karts) if (o !== c.owner && o.state === 'drive' && Math.hypot(o.x - c.x, o.z - c.z) < r && Math.abs(o.y + 1 - c.y) < 3) {
+        o.slowT = Math.max(o.slowT || 0, 0.3); o.smokeT = 0.3;
+        if (o.isCPU && !(o.ai.miss > 0)) { o.ai.miss = P.smoke.blind; o.ai.missLift = Math.random() < 0.4; o.ai.missSteer = (Math.random() < 0.5 ? -1 : 1) * 3; } } // 前が見えずハンドルが乱れる
       if (c.t > life) { group.remove(c.mesh); clouds.splice(i, 1); }
     }
     for (let i = shells.length - 1; i >= 0; i--) {
