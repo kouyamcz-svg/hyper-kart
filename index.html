@@ -311,7 +311,7 @@ const CFG = {
     fillTime: 45, rankBonus: 0.08, driftMul: 1.5, hitBonus: 0.12, // ゲージ：満タンまでの秒数、順位1つ下がるごとの加速、ドリフト中の倍率、被弾時の増加
     cpuDelay: [0.5, 2.5], cpuForce: 10, slowMul: 0.72,            // CPUの発動待ち・強制発動、減速系の最高速倍率
     p: {
-      intimidate: { time: 4, range: 16 }, bigjump: { up: 12, boost: 1.6, inv: 1.5, kick: 1.08, speedMul: 1.05, landBoost: 0.6 }, flash: { range: 55, time: 2.0, cone: 0.3, slow: 1.0, boost: 1.2 },
+      intimidate: { time: 4, range: 16 }, bigjump: { up: 15, gravMul: 0.55, airSteer: 0.9, boost: 1.6, kick: 1.08, speedMul: 1.05, landBoost: 0.6 }, /* 上向きの初速・空中の重力倍率・空中で曲がれる割合 */ flash: { range: 55, time: 2.0, cone: 0.3, slow: 1.0, boost: 1.2 },
       tsuppari: { time: 3 }, turbo: { time: 2.2 }, reflect: { time: 6 }, dragon: { time: 2.5, speedMul: 1.06 }, smoke: { time: 2, life: 6, radius: 6, boost: 1.5, blind: 0.6 },
       lonewolf: { base: 1.0, perRank: 0.36 }, artillery: { delay: 1.2, radius: 3.5, stun: 0.7 }, volley: { spread: 0.16, boost: 1.5 },
     },
@@ -1404,11 +1404,12 @@ function stepKart(k, inp, dt) {
     } else vL *= Math.exp(-(k.slideT > 0 ? CFG.collide.slideGrip : K.grip) * dt); // ぶつけられた直後は横に滑る
   } else {
     vL *= Math.exp(-K.airGrip * dt);
+    if (k.floatT > 0 && boosting) vF = Math.min(MS * B.maxMul * (k.boostMul || 1), vF + B.accel * dt); // 大ジャンプ中は空中でも加速
     k.air += dt;
   }
   if (spinning) { const f = Math.exp(-CFG.items.spinDecel * dt); vF *= f; vL *= f; }
   if (k.boostT > 0) k.boostT = Math.max(0, k.boostT - dt);
-  const sp = Math.abs(vF), air = k.grounded ? 1 : K.airSteer;
+  const sp = Math.abs(vF), air = k.grounded ? 1 : (k.floatT > 0 ? CFG.skills.p.bigjump.airSteer : K.airSteer); // 大ジャンプ中は空中でも曲がれる
   const base = Math.min(1, sp / K.turnSpeedRef) * (1 - K.highSpeedTurnLoss * Math.min(1, sp / MS)) * air;
   if (k.drifting) {
     const into = (inp.steer * k.driftDir + 1) / 2;
@@ -1421,6 +1422,14 @@ function stepKart(k, inp, dt) {
   k.vx = fx * vF + rx * vL; k.vz = fz * vF + rz * vL;
   k.x += k.vx * dt; k.z += k.vz * dt;
   wallCollide(k);
+  if (k.floatT > 0 && !k.grounded) { // 大ジャンプ中はコースの幅から外へ出ない（ガードレールより高く飛ぶため）
+    const q0 = trackQuery(k.x, k.z, k.idx), lim = q0.hw + CFG.track.shoulder - K.radius;
+    if (Math.abs(q0.lat) > lim) {
+      const sg = Math.sign(q0.lat), sl = Math.hypot(q0.side.x, q0.side.z), nx = q0.side.x / sl * sg, nz = q0.side.z / sl * sg, ex = (Math.abs(q0.lat) - lim) * sl;
+      k.x -= nx * ex; k.z -= nz * ex;
+      const vn = k.vx * nx + k.vz * nz; if (vn > 0) { k.vx -= nx * vn; k.vz -= nz * vn; }
+    }
+  }
 
   const yPrev = k.y;
   if (k.grounded) {
@@ -1431,7 +1440,8 @@ function stepKart(k, inp, dt) {
     } else { k.grounded = false; k.air = 0; }
   }
   if (!k.grounded) {
-    k.vy -= K.gravity * dt;
+    if (k.floatT > 0) k.floatT -= dt;
+    k.vy -= K.gravity * (k.floatT > 0 ? CFG.skills.p.bigjump.gravMul : 1) * dt; // 大ジャンプ中は重力を弱めてふわっと長く飛ぶ
     k.y += k.vy * dt;
     groundAt(k.x, k.z, yPrev + K.stepUp, _g);
     if (_g.hit && k.y <= _g.h) {
@@ -1439,7 +1449,7 @@ function stepKart(k, inp, dt) {
       k.y = _g.h; k.vy = 0; k.grounded = true; k.surf = _g.type;
       k.suspV -= Math.max(0, imp) * K.susImpulse; k.lastLand = imp;
       if (k.trick) { giveBoost(k, D.trickBoost, 'trick'); k.trick = false; }
-      if (k.jumpSk) { giveBoost(k, CFG.skills.p.bigjump.landBoost, 'skill'); k.jumpSk = false; } // 大ジャンプの着地で追加加速
+      if (k.jumpSk) { giveBoost(k, CFG.skills.p.bigjump.landBoost, 'skill'); k.jumpSk = false; k.floatT = 0; } // 大ジャンプの着地で追加加速
     }
   }
 
@@ -2087,7 +2097,7 @@ const Items = (() => {
 // =====================================================================
 const SKILLS = {
   intimidate: { name: '威圧', icon: '😠', color: 0xb0203a, desc: '4秒間、周り16m以内のカートを大きく減速させる' },
-  bigjump:    { name: '大ジャンプ', icon: '🐒', color: 0xffd23f, desc: '踏み切りで加速して高く跳び、空中は無敵。少し速いブーストが1.6秒続き、着地でさらに加速' },
+  bigjump:    { name: '大ジャンプ', icon: '🐒', color: 0xffd23f, desc: '踏み切りで加速して高く跳び、約2.5秒ふわっと滞空（空中は無敵で、空中でも曲がれる）。着地でさらに加速' },
   flash:      { name: 'サングラスフラッシュ', icon: '😎', color: 0xffffff, desc: '1.2秒加速しながら、前方55m以内のカートの目をくらませる。くらった相手は2秒ハンドルが乱れ、1秒減速' },
   tsuppari:   { name: 'つっぱり', icon: '🤚', color: 0xc36bff, desc: '3秒間、前へ突進。触れたカートを吹き飛ばす' },
   turbo:      { name: 'フルスロットル', icon: '🔥', color: 0xff8a2a, desc: 'その場で段階3のミニターボより長い2.2秒の加速' },
@@ -2121,7 +2131,8 @@ const Skills = (() => {
       if (!k.grounded) { k.sp = 1; return false; }
       const B = P.bigjump, MS = CFG.kart.maxSpeed * k.st.speed, fx = Math.sin(k.yaw), fz = Math.cos(k.yaw), vf = k.vx * fx + k.vz * fz;
       if (vf < MS * B.kick) { k.vx += fx * (MS * B.kick - vf); k.vz += fz * (MS * B.kick - vf); } // 踏み切りで前へ加速
-      k.vy = B.up; k.grounded = false; k.air = 0; giveBoost(k, B.boost, 'skill'); k.boostMul = B.speedMul; k.invT = Math.max(k.invT, B.inv); k.jumpSk = true;
+      const flight = 2 * B.up / (CFG.kart.gravity * B.gravMul); // 平らな地面での滞空時間
+      k.vy = B.up; k.grounded = false; k.air = 0; k.floatT = flight + 0.5; giveBoost(k, flight + B.boost * 0.5, 'skill'); k.boostMul = B.speedMul; k.invT = Math.max(k.invT, flight + 0.2); k.jumpSk = true;
     }
     else if (id === 'flash') for (const o of (giveBoost(k, P.flash.boost, 'skill'), near(k, P.flash.range, o => ahead(k, o) > P.flash.cone))) { o.blindT = P.flash.time; o.slowT = Math.max(o.slowT || 0, P.flash.slow); if (o.isCPU) { o.ai.miss = P.flash.time; o.ai.missLift = false; o.ai.missSteer = (Math.random() < 0.5 ? -1 : 1) * 4; } if (api.onEvent) api.onEvent('blind', o, k); }
     else if (id === 'tsuppari') { k.skillT = P.tsuppari.time; k.knockT = P.tsuppari.time; k.wMul = 3; giveBoost(k, P.tsuppari.time, 'skill'); }
