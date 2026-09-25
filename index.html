@@ -311,8 +311,8 @@ const CFG = {
     fillTime: 45, rankBonus: 0.08, driftMul: 1.5, hitBonus: 0.12, // ゲージ：満タンまでの秒数、順位1つ下がるごとの加速、ドリフト中の倍率、被弾時の増加
     cpuDelay: [0.5, 2.5], cpuForce: 10, slowMul: 0.72,            // CPUの発動待ち・強制発動、減速系の最高速倍率
     p: {
-      intimidate: { time: 4, range: 16 }, bigjump: { up: 12, boost: 2.0, inv: 1.6, kick: 1.15, speedMul: 1.1, landBoost: 1.0 }, flash: { range: 45, time: 1.6 },
-      tsuppari: { time: 3 }, turbo: { time: 2.2 }, reflect: { time: 6 }, dragon: { time: 3, speedMul: 1.12 }, smoke: { time: 2, life: 6, radius: 6, boost: 1.5, blind: 0.6 },
+      intimidate: { time: 4, range: 16 }, bigjump: { up: 12, boost: 1.6, inv: 1.5, kick: 1.08, speedMul: 1.05, landBoost: 0.6 }, flash: { range: 45, time: 1.6 },
+      tsuppari: { time: 3 }, turbo: { time: 2.2 }, reflect: { time: 6 }, dragon: { time: 2.5, speedMul: 1.06 }, smoke: { time: 2, life: 6, radius: 6, boost: 1.5, blind: 0.6 },
       lonewolf: { base: 1.0, perRank: 0.36 }, artillery: { delay: 1.2, radius: 3.5, stun: 0.7 }, volley: { spread: 0.22 },
     },
   },
@@ -2087,12 +2087,12 @@ const Items = (() => {
 // =====================================================================
 const SKILLS = {
   intimidate: { name: '威圧', icon: '😠', color: 0xb0203a, desc: '4秒間、周り16m以内のカートを大きく減速させる' },
-  bigjump:    { name: '大ジャンプ', icon: '🐒', color: 0xffd23f, desc: '踏み切りで加速して高く跳び、空中は無敵。いつもより速いブーストが2秒続き、着地でさらに加速' },
+  bigjump:    { name: '大ジャンプ', icon: '🐒', color: 0xffd23f, desc: '踏み切りで加速して高く跳び、空中は無敵。少し速いブーストが1.6秒続き、着地でさらに加速' },
   flash:      { name: 'サングラスフラッシュ', icon: '😎', color: 0xffffff, desc: '前方45m以内のカートの目をくらませ、ハンドルを乱す' },
   tsuppari:   { name: 'つっぱり', icon: '🤚', color: 0xc36bff, desc: '3秒間、前へ突進。触れたカートを吹き飛ばす' },
   turbo:      { name: 'フルスロットル', icon: '🔥', color: 0xff8a2a, desc: 'その場で段階3のミニターボより長い2.2秒の加速' },
   reflect:    { name: 'つるピカ反射', icon: '✨', color: 0xfff27a, desc: '6秒間、飛んできた弾と追跡ドローンを撃った相手へ跳ね返す' },
-  dragon:     { name: '龍の舞', icon: '🐉', color: 0xff3a3a, desc: '3秒間、いつもより速いブーストで無敵の突進。触れたカートを吹き飛ばす' },
+  dragon:     { name: '龍の舞', icon: '🐉', color: 0xff3a3a, desc: '2.5秒間、少し速いブーストで無敵の突進。触れたカートを吹き飛ばす' },
   smoke:      { name: '煙幕', icon: '💨', color: 0x9a9a9a, desc: '煙を吹かして1.5秒加速し、後ろに煙を残す。煙に入ったカートは減速し、前が見えずハンドルが乱れる' },
   lonewolf:   { name: '一匹狼の追い上げ', icon: '🐺', color: 0x5aa0ff, desc: '順位が低いほど長く加速（1位1秒〜8位約3.5秒）' },
   artillery:  { name: '砲撃支援', icon: '💥', color: 0xff5a2a, desc: '自分より上位の3台に砲撃。1.2秒後に着弾してスピン' },
