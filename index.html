@@ -303,6 +303,8 @@ const CFG = {
     brakeKeep: 0.3,   // 前後方向のうち「減速させる」成分の反映率（1で物理どおり、0で減速なし）
     pushKeep: 0.6,    // 前後方向のうち「押されて加速する」成分の反映率
     sideKeep: 1.0,    // 横方向（はじかれる）成分の反映率
+    strikerPush: 0.7, strikerSide: 0.3, struckSide: 1.6, slideTime: 0.4, slideGrip: 1.8, // ぶつけられた側は0.4秒間グリップを弱めて横に滑らせる
+    // ぶつけた側：押し戻しを7割減・横の弾かれを0.3倍、ぶつけられた側：横の弾かれを1.6倍
     yawKick: 0,       // はじかれた時の向きの変化（0で向きは変わらない。値を入れると重さで割るので軽いカートほど大きく振られる）
   },
   skills: {
@@ -1360,6 +1362,7 @@ function stepKart(k, inp, dt) {
   if (k.state !== 'drive') return;
   const K = CFG.kart, SF = CFG.surface, D = CFG.drift, B = CFG.boost;
   if (k.slowT > 0) k.slowT -= dt;
+  if (k.slideT > 0) k.slideT -= dt;
   const MS = K.maxSpeed * k.st.speed * k.speedMul * (k.slowT > 0 ? CFG.skills.slowMul : 1), ACC = K.accel * k.st.accel, TURN = K.turnRate * k.st.handling;
   const fx = Math.sin(k.yaw), fz = Math.cos(k.yaw), rx = -fz, rz = fx;
   let vF = k.vx * fx + k.vz * fz, vL = k.vx * rx + k.vz * rz;
@@ -1398,7 +1401,7 @@ function stepKart(k, inp, dt) {
       a *= Math.exp(-D.grip * dt);
       vF = spd * Math.cos(a); vL = spd * Math.sin(a);
       if (st !== SURF.GRASS && st !== SURF.EMBANK && st !== SURF.SAND) k.charge += dt * (D.chargeBase + D.chargeSteer * Math.max(0, inp.steer * k.driftDir));
-    } else vL *= Math.exp(-K.grip * dt);
+    } else vL *= Math.exp(-(k.slideT > 0 ? CFG.collide.slideGrip : K.grip) * dt); // ぶつけられた直後は横に滑る
   } else {
     vL *= Math.exp(-K.airGrip * dt);
     k.air += dt;
@@ -1509,24 +1512,29 @@ function collideKarts(ks) {
       wallCollide(o);
       continue;
     }
-    const wa = a.st.weight * (a.wMul || 1), wb = b.st.weight * (b.wMul || 1), ta = wb / (wa + wb), tb = wa / (wa + wb);
+    const wa = a.st.weight * (a.wMul || 1), wb = b.st.weight * (b.wMul || 1);
+    // ぶつけた側＝相手に向かう速さが大きい方。ぶつけられた側が多く押し出され、横にずれる
+    const aStrikes = (a.vx * nx + a.vz * nz) >= -(b.vx * nx + b.vz * nz);
+    let ta = wb / (wa + wb), tb = wa / (wa + wb);
+    if (aStrikes) { ta *= 1 - C.strikerPush; tb = 1 - ta; } else { tb *= 1 - C.strikerPush; ta = 1 - tb; }
     a.x -= nx * ov * ta; a.z -= nz * ov * ta; b.x += nx * ov * tb; b.z += nz * ov * tb;
     wallCollide(a); wallCollide(b); // 押し合いでガードレールの外へ押し出されないようにする
     const vrel = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
     if (vrel < 0) {
       const J = -(1 + C.restitution) * vrel / (1 / wa + 1 / wb); // 重さを考慮した衝撃量（重いほど速度が変わりにくい）
-      bumpKart(a, -J * nx, -J * nz, wa, nx, nz);
-      bumpKart(b, J * nx, J * nz, wb, -nx, -nz);
+      bumpKart(a, -J * nx, -J * nz, wa, nx, nz, aStrikes ? C.strikerSide : C.struckSide);
+      bumpKart(b, J * nx, J * nz, wb, -nx, -nz, aStrikes ? C.struckSide : C.strikerSide);
+      (aStrikes ? b : a).slideT = C.slideTime;
     }
   }
 }
 // 衝撃(ix,iz)を前後・横に分けて反映。(cx,cz)は自分から見た接触方向
-function bumpKart(k, ix, iz, w, cx, cz) {
+function bumpKart(k, ix, iz, w, cx, cz, sideMul = 1) {
   const C = CFG.collide, fx = Math.sin(k.yaw), fz = Math.cos(k.yaw), rx = -fz, rz = fx;
   const il = ix * fx + iz * fz, is = ix * rx + iz * rz;
   const lk = il < 0 ? C.brakeKeep : C.pushKeep;
-  k.vx += (fx * il * lk + rx * is * C.sideKeep) / w;
-  k.vz += (fz * il * lk + rz * is * C.sideKeep) / w;
+  k.vx += (fx * il * lk + rx * is * C.sideKeep * sideMul) / w;
+  k.vz += (fz * il * lk + rz * is * C.sideKeep * sideMul) / w;
   // 前寄りに当たって横へはじかれると鼻先が振られる（後ろ寄りなら逆）
   k.yaw -= C.yawKick * is * (cx * fx + cz * fz) / w;
 }
