@@ -2387,13 +2387,13 @@ const $ = id => document.getElementById(id);
 // =====================================================================
 const CHARACTERS = [
   // ---- 熊谷の帝王（キャラデザ画像をもとにプリミティブで再構成。クラス・性能はデザインの印象から設定）----
-  { id: 'makyo', skill: 'intimidate',   name: '魔キョー',     team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.022, accel: 0.90, handling: 0.92, weight: 1.22 },
+  { id: 'makyo', skill: 'intimidate',   name: '魔キョー',     team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.022, accel: 0.95, handling: 0.92, weight: 1.22 },
     look: { body: 0x202020, suit: 0x151515, skin: 0xe8b890, hair: 'slick', hairColor: 0x2a1a10, eyes: 'tint', face: ['scar'], outfit: 'suit', scale: 1.1 } },
   { id: 'manzai', skill: 'bigjump',  name: 'THEマンザイ', team: '熊谷の帝王', cls: 'light', stats: { speed: 0.99, accel: 1.18, handling: 1.12, weight: 0.78 },
     look: { body: 0xffd23f, suit: 0x4a2e1a, skin: 0xd9b48a, headColor: 0x4a2e1a, eyes: 'dots', face: ['monkey'], outfit: 'fur', scale: 0.92 } },
   { id: 'syun', skill: 'flash',    name: 'スュンさん',   team: '熊谷の帝王', cls: 'light', stats: { speed: 0.99, accel: 1.16, handling: 1.10, weight: 0.80 },
     look: { body: 0x3b6fb6, suit: 0x1c1c1c, skin: 0xf5c9a0, hair: 'wavy', hairColor: 0x8a5a2b, eyes: 'sun', face: ['beard'], outfit: 'tee', scale: 0.92 } },
-  { id: 'molly', skill: 'tsuppari',   name: 'モーリー',     team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.015, accel: 0.88, handling: 0.88, weight: 1.32 },
+  { id: 'molly', skill: 'tsuppari',   name: 'モーリー',     team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.015, accel: 0.93, handling: 0.88, weight: 1.32 },
     look: { body: 0x6b3fa0, suit: 0xf5c9a0, skin: 0xf5c9a0, hair: 'topknot', hairColor: 0x111111, eyes: 'dots', outfit: 'sumo', scale: 1.14 } },
   { id: 'takumi', skill: 'turbo',  name: 'タクミ',       team: '熊谷の帝王', cls: 'mid',   stats: { speed: 1.01, accel: 1.00, handling: 1.02, weight: 1.02 },
     look: { body: 0x8b5a2b, suit: 0xa0703a, skin: 0xffd9b8, hair: 'spiky', hairColor: 0xf2cf4a, eyes: 'dots', face: ['cheeks'], outfit: 'shirt' } },
@@ -2405,10 +2405,10 @@ const CHARACTERS = [
     look: { body: 0x6f7f5f, suit: 0x8a9a7a, skin: 0xf0c49c, hair: 'short', hairColor: 0x6a6a6a, eyes: 'dots', face: ['cig'], outfit: 'sweater' } },
   { id: 'ookami', skill: 'lonewolf',  name: '案内所の一匹狼', team: '熊谷の帝王', cls: 'mid', stats: { speed: 1.02, accel: 0.98, handling: 0.98, weight: 1.04 },
     look: { body: 0xff7a1a, suit: 0x1c1c24, skin: 0xf5c9a0, hair: 'pompadour', hairColor: 0xf28a1e, eyes: 'dots', face: ['cig'], outfit: 'open' } },
-  { id: 'sosen', skill: 'artillery',   name: 'ヒロシの先祖', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.028, accel: 0.88, handling: 0.90, weight: 1.26 },
+  { id: 'sosen', skill: 'artillery',   name: 'ヒロシの先祖', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.028, accel: 0.93, handling: 0.90, weight: 1.26 },
     look: { body: 0x7a7a4a, suit: 0x8a8455, skin: 0xf0c49c, hat: 'army', eyes: 'dots', outfit: 'army', scale: 1.1 } },
   // 5人乗り：運転手＋後ろ左右＋前左右
-  { id: 'tsuwamono', skill: 'volley', name: '案内所の強者たち', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.018, accel: 0.86, handling: 0.86, weight: 1.32 },
+  { id: 'tsuwamono', skill: 'volley', name: '案内所の強者たち', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.018, accel: 0.92, handling: 0.86, weight: 1.32 },
     look: { body: 0x2a2a2e, scale: 1.12, crew: [
       { suit: 0x1a1a1a, skin: 0xe8b890, hair: 'spiky', hairColor: 0x7a4a22, eyes: 'sun', outfit: 'tank' },
       { suit: 0x6a6e76, skin: 0xe8b890, hat: 'cap', eyes: 'sun', face: ['mask'], outfit: 'tee', pos: [-0.44, -0.04, -0.52], s: 0.85 },
