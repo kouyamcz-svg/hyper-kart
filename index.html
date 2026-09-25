@@ -313,7 +313,7 @@ const CFG = {
     p: {
       intimidate: { time: 4, range: 16 }, bigjump: { up: 12, boost: 1.6, inv: 1.5, kick: 1.08, speedMul: 1.05, landBoost: 0.6 }, flash: { range: 45, time: 1.6 },
       tsuppari: { time: 3 }, turbo: { time: 2.2 }, reflect: { time: 6 }, dragon: { time: 2.5, speedMul: 1.06 }, smoke: { time: 2, life: 6, radius: 6, boost: 1.5, blind: 0.6 },
-      lonewolf: { base: 1.0, perRank: 0.36 }, artillery: { delay: 1.2, radius: 3.5, stun: 0.7 }, volley: { spread: 0.22 },
+      lonewolf: { base: 1.0, perRank: 0.36 }, artillery: { delay: 1.2, radius: 3.5, stun: 0.7 }, volley: { spread: 0.16, boost: 1.5 },
     },
   },
   fx: {
@@ -2096,7 +2096,7 @@ const SKILLS = {
   smoke:      { name: '煙幕', icon: '💨', color: 0x9a9a9a, desc: '煙を吹かして1.5秒加速し、後ろに煙を残す。煙に入ったカートは減速し、前が見えずハンドルが乱れる' },
   lonewolf:   { name: '一匹狼の追い上げ', icon: '🐺', color: 0x5aa0ff, desc: '順位が低いほど長く加速（1位1秒〜8位約3.5秒）' },
   artillery:  { name: '砲撃支援', icon: '💥', color: 0xff5a2a, desc: '自分より上位の3台に砲撃。1.2秒後に着弾してスピン' },
-  volley:     { name: '総攻撃', icon: '👊', color: 0xff8c1a, desc: '5人がはねかえり弾を扇形に一斉発射' },
+  volley:     { name: '総攻撃', icon: '👊', color: 0xff8c1a, desc: '5人がはねかえり弾を扇形に一斉発射し、仲間が押して1.5秒加速' },
 };
 const Skills = (() => {
   const G = CFG.skills, group = new THREE.Group(), clouds = [], shells = [];
@@ -2134,7 +2134,7 @@ const Skills = (() => {
       const tg = [...Race.karts].filter(o => o !== k && !o.finished && o.rank < k.rank).sort((a, b) => b.rank - a.rank).slice(0, 3);
       const list = tg.length ? tg : [...Race.karts].filter(o => o !== k && !o.finished).sort((a, b) => a.rank - b.rank).slice(0, 3);
       for (const o of list) { const m = new THREE.Mesh(ringGeo, ringMat); group.add(m); shells.push({ tgt: o, owner: k, t: 0, mesh: m }); if (api.onEvent) api.onEvent('target', o, k); }
-    } else if (id === 'volley') for (let i = -2; i <= 2; i++) Items.spawnShot(k, i * P.volley.spread);
+    } else if (id === 'volley') { for (let i = -2; i <= 2; i++) Items.spawnShot(k, i * P.volley.spread); giveBoost(k, P.volley.boost, 'skill'); } // 撃ちながら仲間が押して加速
     if (api.onEvent) api.onEvent('use', k, k);
     return true;
   };
@@ -2408,7 +2408,7 @@ const CHARACTERS = [
   { id: 'sosen', skill: 'artillery',   name: 'ヒロシの先祖', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.028, accel: 0.93, handling: 0.90, weight: 1.26 },
     look: { body: 0x7a7a4a, suit: 0x8a8455, skin: 0xf0c49c, hat: 'army', eyes: 'dots', outfit: 'army', scale: 1.1 } },
   // 5人乗り：運転手＋後ろ左右＋前左右
-  { id: 'tsuwamono', skill: 'volley', name: '案内所の強者たち', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.018, accel: 0.92, handling: 0.86, weight: 1.32 },
+  { id: 'tsuwamono', skill: 'volley', name: '案内所の強者たち', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.018, accel: 0.92, handling: 0.9, weight: 1.32 },
     look: { body: 0x2a2a2e, scale: 1.12, crew: [
       { suit: 0x1a1a1a, skin: 0xe8b890, hair: 'spiky', hairColor: 0x7a4a22, eyes: 'sun', outfit: 'tank' },
       { suit: 0x6a6e76, skin: 0xe8b890, hat: 'cap', eyes: 'sun', face: ['mask'], outfit: 'tee', pos: [-0.44, -0.04, -0.52], s: 0.85 },
