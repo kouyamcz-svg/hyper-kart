@@ -29,6 +29,8 @@
   .btn.on{background:rgba(255,214,70,.5)}
   #btnAccel{width:112px;height:112px;right:calc(env(safe-area-inset-right) + 24px);bottom:calc(env(safe-area-inset-bottom) + 22px)}
   #btnDrift{width:86px;height:86px;right:calc(env(safe-area-inset-right) + 36px);bottom:calc(env(safe-area-inset-bottom) + 148px)}
+  #btnSkill{flex-direction:column;font-size:12px;line-height:1.1;text-align:center}
+  #btnSkill.ready{box-shadow:0 0 0 3px #ffd64a,0 0 18px 6px rgba(255,214,70,.8);animation:blink .5s steps(2) infinite}
   #btnItem{width:78px;height:78px;right:calc(env(safe-area-inset-right) + 146px);bottom:calc(env(safe-area-inset-bottom) + 112px)}
   #itemSlot{position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 8px);transform:translateX(-50%);width:62px;height:62px;
     border-radius:14px;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-size:36px}
@@ -36,6 +38,7 @@
     text-shadow:0 1px 3px rgba(0,0,0,.8);white-space:nowrap}
   #vignette{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(255,0,0,0) 45%,rgba(255,20,40,.75) 100%)}
   #flash{position:fixed;inset:0;pointer-events:none;opacity:0;background:#fff}
+  #smokeOv{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(ellipse at center,rgba(150,150,160,.55) 20%,rgba(120,120,130,.95) 100%)}
   #speedlines{position:fixed;inset:-20%;pointer-events:none;opacity:0;
     background:repeating-conic-gradient(from 0deg,rgba(255,255,255,0) 0deg 5deg,rgba(255,255,255,.55) 5deg 5.5deg);
     -webkit-mask-image:radial-gradient(circle,transparent 32%,#000 72%);mask-image:radial-gradient(circle,transparent 32%,#000 72%)}
@@ -119,7 +122,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="speedlines"></div><div id="vignette"></div><div id="flash"></div>
+<div id="speedlines"></div><div id="vignette"></div><div id="flash"></div><div id="smokeOv"></div>
 <div id="ui" style="display:none">
   <div id="hud">
     <div id="rank"><span id="rk">-</span><small>位 / <span id="rkn">8</span></small></div>
@@ -137,6 +140,7 @@
   <div id="btnAccel" class="btn">アクセル</div>
   <div id="btnDrift" class="btn">ドリフト</div>
   <div id="btnItem" class="btn">アイテム</div>
+  <div id="btnSkill" class="btn"><span id="skillLab">技</span></div>
   <div id="itemSlot"></div><div id="itemName"></div>
   <div id="alert"></div><div id="banner"></div>
   <div id="btnQuit" class="pill">やめる</div>
@@ -300,6 +304,15 @@ const CFG = {
     pushKeep: 0.6,    // 前後方向のうち「押されて加速する」成分の反映率
     sideKeep: 1.0,    // 横方向（はじかれる）成分の反映率
     yawKick: 0.1,     // はじかれた時の向きの変化（重さで割るので軽いカートほど大きく振られる）
+  },
+  skills: {
+    fillTime: 28, rankBonus: 0.08, driftMul: 1.5, hitBonus: 0.12, // ゲージ：満タンまでの秒数、順位1つ下がるごとの加速、ドリフト中の倍率、被弾時の増加
+    cpuDelay: [0.5, 2.5], cpuForce: 10, slowMul: 0.72,            // CPUの発動待ち・強制発動、減速系の最高速倍率
+    p: {
+      intimidate: { time: 4, range: 16 }, bigjump: { up: 12, boost: 1.2, inv: 1.3 }, flash: { range: 45, time: 1.6 },
+      tsuppari: { time: 3 }, turbo: { time: 2.2 }, reflect: { time: 6 }, dragon: { time: 2 }, smoke: { time: 1.5, life: 5, radius: 5 },
+      lonewolf: { base: 1.0, perRank: 0.36 }, artillery: { delay: 1.2, radius: 3.5, stun: 0.7 }, volley: { spread: 0.22 },
+    },
   },
   fx: {
     smallMax: 500, smallSize: 0.55, bigMax: 180, bigSize: 1.8,   // 光パーティクルの数とサイズ
@@ -1289,7 +1302,7 @@ function createKart(o) {
   const model = makeKartModel(o.look || o.char.look), shield = new THREE.Mesh(SHIELD_GEO, SHIELD_MAT);
   shield.visible = false; shield.position.y = 0.7; model.root.add(shield);
   const stars = new THREE.Mesh(STAR_GEO, STAR_MAT); stars.visible = false; stars.position.y = 1.85; model.root.add(stars);
-  return { stars, slot: 0, itemState: 'none', item: -1, rollT: 0, spinT: 0, spinDur: 1, invT: 0, shieldT: 0, shield, name: o.name, isCPU: !!o.cpu, isPlayer: !o.cpu, char: o.char, cls: o.char.cls, st, color: o.look || o.char.look, stallT: 0,
+  return { sp: 0, skillT: 0, knockT: 0, reflectT: 0, blindT: 0, slowT: 0, smokeT: 0, wMul: 1, stars, slot: 0, itemState: 'none', item: -1, rollT: 0, spinT: 0, spinDur: 1, invT: 0, shieldT: 0, shield, name: o.name, isCPU: !!o.cpu, isPlayer: !o.cpu, char: o.char, cls: o.char.cls, st, color: o.look || o.char.look, stallT: 0,
     x: 0, y: 0, z: 0, yaw: 0, vx: 0, vz: 0, vy: 0, speed: 0, steer: 0, idx: -1, lat: 0, u: 0,
     grounded: true, surf: SURF.ROAD, air: 0, n: new THREE.Vector3(0, 1, 0), wheelRot: 0,
     susp: 0, suspV: 0, lastLand: 0, state: 'drive', res: null,
@@ -1346,7 +1359,8 @@ function stepKart(k, inp, dt) {
   k.steer = inp.steer;
   if (k.state !== 'drive') return;
   const K = CFG.kart, SF = CFG.surface, D = CFG.drift, B = CFG.boost;
-  const MS = K.maxSpeed * k.st.speed * k.speedMul, ACC = K.accel * k.st.accel, TURN = K.turnRate * k.st.handling;
+  if (k.slowT > 0) k.slowT -= dt;
+  const MS = K.maxSpeed * k.st.speed * k.speedMul * (k.slowT > 0 ? CFG.skills.slowMul : 1), ACC = K.accel * k.st.accel, TURN = K.turnRate * k.st.handling;
   const fx = Math.sin(k.yaw), fz = Math.cos(k.yaw), rx = -fz, rz = fx;
   let vF = k.vx * fx + k.vz * fz, vL = k.vx * rx + k.vz * rz;
 
@@ -1482,8 +1496,9 @@ function collideKarts(ks) {
     if (d2 >= R2 * R2) continue;
     const d = Math.sqrt(d2) || 1e-3, nx = dx / d, nz = dz / d, ov = R2 - d;
     // バリア中の体当たり：相手だけを吹き飛ばし、バリア側は減速も押し戻しもなくそのまま進む
-    if ((a.shieldT > 0) !== (b.shieldT > 0)) {
-      const sA = a.shieldT > 0, sh = sA ? a : b, o = sA ? b : a, sx = sA ? nx : -nx, sz = sA ? nz : -nz, SH = CFG.items.shield;
+    const kA = a.shieldT > 0 || a.knockT > 0, kB = b.shieldT > 0 || b.knockT > 0; // バリア・突進系の技
+    if (kA !== kB) {
+      const sA = kA, sh = sA ? a : b, o = sA ? b : a, sx = sA ? nx : -nx, sz = sA ? nz : -nz, SH = CFG.items.shield;
       o.x += sx * ov; o.z += sz * ov; // 重なりは全部相手側へ
       if (Items.hitKart(o, 1, 'shield', sh)) {
         const vs = Math.max(0, sh.vx * sx + sh.vz * sz), vo = o.vx * sx + o.vz * sz;
@@ -1494,7 +1509,7 @@ function collideKarts(ks) {
       wallCollide(o);
       continue;
     }
-    const wa = a.st.weight, wb = b.st.weight, ta = wb / (wa + wb), tb = wa / (wa + wb);
+    const wa = a.st.weight * (a.wMul || 1), wb = b.st.weight * (b.wMul || 1), ta = wb / (wa + wb), tb = wa / (wa + wb);
     a.x -= nx * ov * ta; a.z -= nz * ov * ta; b.x += nx * ov * tb; b.z += nz * ov * tb;
     wallCollide(a); wallCollide(b); // 押し合いでガードレールの外へ押し出されないようにする
     const vrel = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
@@ -1599,7 +1614,7 @@ const Race = {
       Object.assign(k.inp, { steer: 0, accel: false, brake: false, drift: false, driftEdge: false });
       k.itemState = 'none'; k.item = -1; k.spinT = 0; k.invT = 0; k.shieldT = 0; k.stallT = 0; k.scT = 0; k.safeIdx = k.idx; k.lastFall = null;
     });
-    Items.reset();
+    Items.reset(); Skills.reset();
     this.state = 'count'; this.t = 0; this.time = 0; this.postT = 0; this.finishOrder = [];
     this.rank();
     Cam.init = false;
@@ -1676,6 +1691,7 @@ function cpuThink(k, dt) {
     if (k.speed > vt + A.brakeHyst) { inp.brake = true; inp.accel = false; } else if (k.speed > vt) inp.accel = false; }
   if (Math.abs(k.speed) < 1.5 && k.spinT <= 0) { ai.stuck += dt; if (ai.stuck > A.stuckTime) Rescue.start(k); } else ai.stuck = 0;
   cpuItem(k, dt, d);
+  Skills.cpu(k, dt);
 }
 // CPUのアイテム使用判断
 function cpuItem(k, dt, d) {
@@ -1860,7 +1876,7 @@ const Items = (() => {
       return false;
     }
     if (k.invT > 0) return false;
-    k.spinDur = k.spinT = C.spinTime * mul; k.invT = k.spinDur + C.invAfter;
+    k.spinDur = k.spinT = C.spinTime * mul; k.invT = k.spinDur + C.invAfter; Skills.onHit(k);
     k.drifting = false; k.charge = 0; k.boostT = 0; k.trick = false;
     const col = SRC_COLOR[src] || 0xffffff;
     FX.burst(k.x, k.y + 0.8, k.z, [col, 0xffffff, 0xfff27a], 22, 9, 0.6, true, 10);
@@ -1877,16 +1893,18 @@ const Items = (() => {
     const L = AI_LV(), D = C.cpu.delay;
     k.ai.itemT = 0; k.ai.itemDelay = (D[0] + Math.random() * (D[1] - D[0])) / Math.max(0.1, L.itemRate);
   }
+  function spawnShot(k, off) { // はねかえり弾を1発出す（offは進行方向からの角度）
+    const fx = Math.sin(k.yaw + off), fz = Math.cos(k.yaw + off), sp = C.shot.speed + Math.max(0, k.speed);
+    const m = add(gShot, mShot); m.add(new THREE.Mesh(gShotGlow, mGlow(CL.shot)));
+    shots.push({ x: k.x + fx * 2.2, y: k.y + C.shot.radius, z: k.z + fz * 2.2, vx: fx * sp, vz: fz * sp, t: 0, b: 0, owner: k, mesh: m });
+    FX.burst(k.x + fx * 2.2, k.y + 0.5, k.z + fz * 2.2, [CL.shot, 0xfff27a], 12, 7, 0.3);
+  }
   function use(k) {
     if (k.itemState !== 'have' || k.spinT > 0 || k.state !== 'drive') return false;
     const it = k.item; k.item = -1; k.itemState = 'none';
     const fx = Math.sin(k.yaw), fz = Math.cos(k.yaw);
-    if (it === IT.SHOT) {
-      const sp = C.shot.speed + Math.max(0, k.speed);
-      const m = add(gShot, mShot); m.add(new THREE.Mesh(gShotGlow, mGlow(CL.shot)));
-      shots.push({ x: k.x + fx * 2.2, y: k.y + C.shot.radius, z: k.z + fz * 2.2, vx: fx * sp, vz: fz * sp, t: 0, b: 0, owner: k, mesh: m });
-      FX.burst(k.x + fx * 2.2, k.y + 0.5, k.z + fz * 2.2, [CL.shot, 0xfff27a], 12, 7, 0.3);
-    } else if (it === IT.HOMING) {
+    if (it === IT.SHOT) spawnShot(k, 0);
+    else if (it === IT.HOMING) {
       const tgt = Race.karts.find(o => o.rank === k.rank - 1 && !o.finished) || null;
       const m = add(gHom, VCMAT), light = new THREE.Mesh(gLight, mGlow(CL.homing)); light.position.y = 0.3; m.add(light);
       homings.push({ f: k.idx + 2, lat: k.lat, x: k.x, y: k.y + C.homing.height, z: k.z, t: 0, owner: k, tgt, direct: false, mesh: m, light });
@@ -1952,7 +1970,9 @@ const Items = (() => {
         const tr = traps[j];
         if (Math.hypot(tr.x - s.x, tr.z - s.z) < 1.2 && Math.abs(tr.y - s.y) < 1.5) { FX.burst(tr.x, tr.y + 0.5, tr.z, [CL.trap, CL.shot], 20, 8, 0.5); remove(traps, j); gone = true; break; }
       }
-      if (!gone) { const h = kartHit(s.x, s.y, s.z, SC.hitRadius, s.t < SC.ownerGrace ? s.owner : null); if (h) { hitKart(h, 1, 'shot', s.owner); gone = true; } }
+      if (!gone) { const h = kartHit(s.x, s.y, s.z, SC.hitRadius, s.t < SC.ownerGrace ? s.owner : null);
+        if (h && h.reflectT > 0) { s.vx = -s.vx; s.vz = -s.vz; s.owner = h; s.t = 0; FX.ring(h.x, h.y + 0.3, h.z, 0xfff27a, 3, 0.3); } // 反射
+        else if (h) { hitKart(h, 1, 'shot', s.owner); gone = true; } }
       if (gone) remove(shots, i);
     }
     const HC = C.homing;
@@ -1972,6 +1992,7 @@ const Items = (() => {
         h.x = cx + S[a3] * h.lat; h.y = cy + S[a3 + 1] * h.lat + HC.height; h.z = cz + S[a3 + 2] * h.lat;
       }
       const hk = kartHit(h.x, h.y, h.z, HC.hitRadius, h.owner);
+      if (hk && hk.reflectT > 0 && h.owner && h.owner !== hk) { h.tgt = h.owner; h.owner = hk; h.direct = true; FX.ring(hk.x, hk.y + 0.3, hk.z, 0xfff27a, 3, 0.3); continue; } // 反射して撃った相手へ
       if (hk) { hitKart(hk, 1, 'homing', h.owner); remove(homings, i); continue; }
       if (h.t > HC.life) { FX.burst(h.x, h.y, h.z, CL.homing, 12, 5, 0.4); remove(homings, i); }
     }
@@ -2048,7 +2069,115 @@ const Items = (() => {
     for (const l of [shots, homings, traps, strikes]) while (l.length) remove(l, l.length - 1);
     for (const b of boxes) { b.active = true; b.t = 0; b.grow = 1; }
   }
-  const api = { group, use, step, frame, reset, setup, hitKart, pickItem, shots, homings, traps, strikes, boxes, onUse: null, onBox: null, onBounce: null };
+  const api = { spawnShot, group, use, step, frame, reset, setup, hitKart, pickItem, shots, homings, traps, strikes, boxes, onUse: null, onBox: null, onBounce: null };
+  return api;
+})();
+
+// =====================================================================
+// SKILLS：キャラ専用の技（ゲージが満タンで発動。グランプリのみ）
+// =====================================================================
+const SKILLS = {
+  intimidate: { name: '威圧', icon: '😠', color: 0xb0203a, desc: '4秒間、周り16m以内のカートを大きく減速させる' },
+  bigjump:    { name: '大ジャンプ', icon: '🐒', color: 0xffd23f, desc: '高く跳び上がり、空中は無敵＋ブースト。切れ目も飛び越えられる' },
+  flash:      { name: 'サングラスフラッシュ', icon: '😎', color: 0xffffff, desc: '前方45m以内のカートの目をくらませ、ハンドルを乱す' },
+  tsuppari:   { name: 'つっぱり', icon: '🤚', color: 0xc36bff, desc: '3秒間、前へ突進。触れたカートを吹き飛ばす' },
+  turbo:      { name: 'フルスロットル', icon: '🔥', color: 0xff8a2a, desc: 'その場で段階3のミニターボより長い2.2秒の加速' },
+  reflect:    { name: 'つるピカ反射', icon: '✨', color: 0xfff27a, desc: '6秒間、飛んできた弾と追跡ドローンを撃った相手へ跳ね返す' },
+  dragon:     { name: '龍の舞', icon: '🐉', color: 0xff3a3a, desc: '2秒間、無敵で突進し、触れたカートを吹き飛ばす' },
+  smoke:      { name: '煙幕', icon: '💨', color: 0x9a9a9a, desc: '後ろに煙を残す。煙に入ったカートは減速し前が見えにくくなる' },
+  lonewolf:   { name: '一匹狼の追い上げ', icon: '🐺', color: 0x5aa0ff, desc: '順位が低いほど長く加速（1位1秒〜8位約3.5秒）' },
+  artillery:  { name: '砲撃支援', icon: '💥', color: 0xff5a2a, desc: '自分より上位の3台に砲撃。1.2秒後に着弾してスピン' },
+  volley:     { name: '総攻撃', icon: '👊', color: 0xff8c1a, desc: '5人がはねかえり弾を扇形に一斉発射' },
+};
+const Skills = (() => {
+  const G = CFG.skills, group = new THREE.Group(), clouds = [], shells = [];
+  const cloudGeo = new THREE.SphereGeometry(1, 10, 8), cloudMat = new THREE.MeshBasicMaterial({ color: 0x8c8c94, transparent: true, opacity: 0.5, depthWrite: false });
+  const ringGeo = new THREE.RingGeometry(1.4, 2.0, 24); ringGeo.rotateX(-Math.PI / 2);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false });
+  const api = { group, enabled: true, onEvent: null, clouds, shells };
+  const near = (k, r, test = () => true) => Race.karts.filter(o => o !== k && o.state === 'drive' && Math.hypot(o.x - k.x, o.z - k.z) < r && Math.abs(o.y - k.y) < 3 && test(o));
+  const ahead = (k, o) => { const dx = o.x - k.x, dz = o.z - k.z, d = Math.hypot(dx, dz) || 1; return (dx * Math.sin(k.yaw) + dz * Math.cos(k.yaw)) / d; };
+  api.fill = (k, dt) => { // ゲージ：時間で溜まる。下位ほど・ドリフト中ほど速い
+    if (!api.enabled || k.state !== 'drive' || k.finished || k.sp >= 1) return;
+    k.sp = Math.min(1, k.sp + dt / G.fillTime * (1 + G.rankBonus * (k.rank - 1)) * (k.drifting ? G.driftMul : 1));
+  };
+  api.onHit = k => { if (api.enabled) k.sp = Math.min(1, k.sp + G.hitBonus); };
+  api.use = k => {
+    if (!api.enabled || k.sp < 1 || k.state !== 'drive' || k.spinT > 0 || k.finished) return false;
+    const id = k.char.skill, P = G.p, S = SKILLS[id];
+    k.sp = 0; k.skillId = id;
+    FX.burst(k.x, k.y + 1, k.z, [S.color, 0xffffff], 26, 9, 0.6, true, 3); FX.ring(k.x, k.y, k.z, S.color, 5, 0.45);
+    if (id === 'intimidate') k.skillT = P.intimidate.time;
+    else if (id === 'bigjump') { if (!k.grounded) { k.sp = 1; return false; } k.vy = P.bigjump.up; k.grounded = false; k.air = 0; giveBoost(k, P.bigjump.boost, 'skill'); k.invT = Math.max(k.invT, P.bigjump.inv); }
+    else if (id === 'flash') for (const o of near(k, P.flash.range, o => ahead(k, o) > 0.45)) { o.blindT = P.flash.time; if (o.isCPU) { o.ai.miss = P.flash.time; o.ai.missLift = false; o.ai.missSteer = (Math.random() < 0.5 ? -1 : 1) * 4; } if (api.onEvent) api.onEvent('blind', o, k); }
+    else if (id === 'tsuppari') { k.skillT = P.tsuppari.time; k.knockT = P.tsuppari.time; k.wMul = 3; giveBoost(k, P.tsuppari.time, 'skill'); }
+    else if (id === 'turbo') giveBoost(k, P.turbo.time, 'skill');
+    else if (id === 'reflect') k.reflectT = P.reflect.time;
+    else if (id === 'dragon') { k.skillT = P.dragon.time; k.knockT = P.dragon.time; k.invT = Math.max(k.invT, P.dragon.time); giveBoost(k, P.dragon.time, 'skill'); }
+    else if (id === 'smoke') { k.skillT = P.smoke.time; k.smokeN = 0; }
+    else if (id === 'lonewolf') giveBoost(k, P.lonewolf.base + P.lonewolf.perRank * (k.rank - 1), 'skill');
+    else if (id === 'artillery') {
+      const tg = [...Race.karts].filter(o => o !== k && !o.finished && o.rank < k.rank).sort((a, b) => b.rank - a.rank).slice(0, 3);
+      const list = tg.length ? tg : [...Race.karts].filter(o => o !== k && !o.finished).sort((a, b) => a.rank - b.rank).slice(0, 3);
+      for (const o of list) { const m = new THREE.Mesh(ringGeo, ringMat); group.add(m); shells.push({ tgt: o, owner: k, t: 0, mesh: m }); if (api.onEvent) api.onEvent('target', o, k); }
+    } else if (id === 'volley') for (let i = -2; i <= 2; i++) Items.spawnShot(k, i * P.volley.spread);
+    if (api.onEvent) api.onEvent('use', k, k);
+    return true;
+  };
+  api.frame = (dt, time) => { // 効果の継続処理（描画フレームごと）
+    for (const k of Race.karts) {
+      if (k.skillT > 0) k.skillT -= dt; if (k.knockT > 0) k.knockT -= dt; if (k.reflectT > 0) k.reflectT -= dt; if (k.blindT > 0) k.blindT -= dt;
+      if (k.knockT <= 0) k.wMul = 1;
+      if (k.skillT > 0 && k.skillId === 'intimidate') {
+        for (const o of near(k, G.p.intimidate.range)) o.slowT = Math.max(o.slowT || 0, 0.25);
+        k.auraT = (k.auraT || 0) - dt; if (k.auraT <= 0) { k.auraT = 0.35; FX.ring(k.x, k.y, k.z, SKILLS.intimidate.color, G.p.intimidate.range, 0.5, 2); }
+      }
+      if (k.skillT > 0 && (k.skillId === 'dragon' || k.skillId === 'tsuppari')) FX.trail(k.x, k.y + 0.8, k.z, SKILLS[k.skillId].color, true, 0.4);
+      if (k.reflectT > 0) { k.auraT = (k.auraT || 0) - dt; if (k.auraT <= 0) { k.auraT = 0.3; FX.ring(k.x, k.y + 0.3, k.z, SKILLS.reflect.color, 2.6, 0.3); } }
+      if (k.skillT > 0 && k.skillId === 'smoke') { // 後ろに煙を置いていく
+        k.smokeCd = (k.smokeCd || 0) - dt;
+        if (k.smokeCd <= 0) { k.smokeCd = 0.25; const m = new THREE.Mesh(cloudGeo, cloudMat); group.add(m);
+          clouds.push({ x: k.x - Math.sin(k.yaw) * 3, y: k.y + 1, z: k.z - Math.cos(k.yaw) * 3, t: 0, owner: k, mesh: m }); }
+      }
+    }
+    const P = G.p;
+    for (let i = clouds.length - 1; i >= 0; i--) {
+      const c = clouds[i]; c.t += dt; const life = P.smoke.life, r = P.smoke.radius * Math.min(1, 0.4 + c.t * 2);
+      c.mesh.position.set(c.x, c.y, c.z); c.mesh.scale.set(r, r * 0.6, r); c.mesh.material.opacity = 0.5;
+      for (const o of Race.karts) if (o !== c.owner && o.state === 'drive' && Math.hypot(o.x - c.x, o.z - c.z) < r && Math.abs(o.y + 1 - c.y) < 3) { o.slowT = Math.max(o.slowT || 0, 0.3); o.smokeT = 0.3; }
+      if (c.t > life) { group.remove(c.mesh); clouds.splice(i, 1); }
+    }
+    for (let i = shells.length - 1; i >= 0; i--) {
+      const s = shells[i]; s.t += dt; const g = s.tgt;
+      s.mesh.position.set(g.x, g.y + 0.08, g.z); s.mesh.scale.setScalar(1 + Math.sin(time * 20) * 0.15);
+      if (s.t >= P.artillery.delay) {
+        for (const o of Race.karts) if (o !== s.owner && Math.hypot(o.x - g.x, o.z - g.z) < P.artillery.radius && Math.abs(o.y - g.y) < 3) Items.hitKart(o, P.artillery.stun, 'strike', s.owner);
+        FX.ring(g.x, g.y, g.z, 0xff8a2a, P.artillery.radius * 1.5, 0.4); FX.burst(g.x, g.y + 1, g.z, [0xff8a2a, 0xffe14a, 0x555555], 30, 11, 0.6, true, 8);
+        if (api.onEvent) api.onEvent('boom', g, s.owner);
+        group.remove(s.mesh); shells.splice(i, 1);
+      }
+    }
+  };
+  api.cpu = (k, dt) => { // CPUの発動判断
+    if (!api.enabled || k.sp < 1 || k.spinT > 0 || k.state !== 'drive') return;
+    k.ai.skT = (k.ai.skT || 0) + dt;
+    if (k.ai.skT < k.ai.skDelay) return;
+    const id = k.char.skill, P = G.p; let go = false;
+    if (id === 'intimidate' || id === 'tsuppari') go = near(k, 14).length > 0;
+    else if (id === 'flash') go = near(k, P.flash.range, o => ahead(k, o) > 0.45).length > 0;
+    else if (id === 'volley') go = near(k, 50, o => ahead(k, o) > 0.8).length > 0;
+    else if (id === 'smoke') go = near(k, 20, o => ahead(k, o) < -0.3).length > 0;
+    else if (id === 'reflect') go = Items.homings.some(h => h.tgt === k) || Items.shots.some(s => s.owner !== k && Math.hypot(s.x - k.x, s.z - k.z) < 25);
+    else if (id === 'artillery') go = true;
+    else go = k.grounded && Math.abs(k.steer) < 0.3; // 加速系は直線で
+    if (k.ai.skT > k.ai.skDelay + G.cpuForce) go = true;
+    if (go && api.use(k)) { k.ai.skT = 0; k.ai.skDelay = G.cpuDelay[0] + Math.random() * (G.cpuDelay[1] - G.cpuDelay[0]); }
+  };
+  api.reset = () => {
+    for (const c of clouds) group.remove(c.mesh); clouds.length = 0;
+    for (const s of shells) group.remove(s.mesh); shells.length = 0;
+    for (const k of Race.karts) { k.sp = 0; k.skillT = 0; k.knockT = 0; k.reflectT = 0; k.blindT = 0; k.slowT = 0; k.smokeT = 0; k.wMul = 1; k.ai.skT = 0; k.ai.skDelay = G.cpuDelay[0] + Math.random() * (G.cpuDelay[1] - G.cpuDelay[0]); }
+  };
   return api;
 })();
 
@@ -2154,7 +2283,7 @@ const Sparks = (() => {
 // =====================================================================
 // INPUT
 // =====================================================================
-const Input = { manualAccel: false, touchItem: false, item: false, itemEdge: false, touchSteer: 0, touchAccel: false, touchBrake: false, touchDrift: false, auto: CFG.input.autoAccel, keys: {}, steer: 0, accel: false, brake: false, drift: false, driftEdge: false };
+const Input = { touchSkill: false, skill: false, skillEdge: false, manualAccel: false, touchItem: false, item: false, itemEdge: false, touchSteer: 0, touchAccel: false, touchBrake: false, touchDrift: false, auto: CFG.input.autoAccel, keys: {}, steer: 0, accel: false, brake: false, drift: false, driftEdge: false };
 (() => {
   const zone = document.getElementById('steer'), knob = document.getElementById('knob');
   let id = null, x0 = 0;
@@ -2178,6 +2307,7 @@ const Input = { manualAccel: false, touchItem: false, item: false, itemEdge: fal
   hold(document.getElementById('btnBrake'), 'touchBrake');
   hold(document.getElementById('btnDrift'), 'touchDrift');
   hold(document.getElementById('btnItem'), 'touchItem');
+  hold(document.getElementById('btnSkill'), 'touchSkill');
   document.getElementById('btnReset').addEventListener('pointerdown', e => { App.restartRace(); e.preventDefault(); });
   document.getElementById('btnQuit').addEventListener('pointerdown', e => { App.toTitle(); e.preventDefault(); });
   addEventListener('keydown', e => { Input.keys[e.code] = true; });
@@ -2197,6 +2327,9 @@ function readInput(dt) {
   const d = Input.touchDrift || !!(k.ShiftLeft || k.ShiftRight || k.KeyX);
   if (d && !Input.drift) Input.driftEdge = true;
   Input.drift = d;
+  const sk = Input.touchSkill || !!(k.KeyC || k.KeyQ);
+  if (sk && !Input.skill) Input.skillEdge = true;
+  Input.skill = sk;
   const it = Input.touchItem || !!(k.KeyZ || k.KeyE);
   if (it && !Input.item) Input.itemEdge = true;
   Input.item = it;
@@ -2237,28 +2370,28 @@ const $ = id => document.getElementById(id);
 // =====================================================================
 const CHARACTERS = [
   // ---- 熊谷の帝王（キャラデザ画像をもとにプリミティブで再構成。クラス・性能はデザインの印象から設定）----
-  { id: 'makyo',   name: '魔キョー',     team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.03, accel: 0.90, handling: 0.92, weight: 1.22 },
+  { id: 'makyo', skill: 'intimidate',   name: '魔キョー',     team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.03, accel: 0.90, handling: 0.92, weight: 1.22 },
     look: { body: 0x202020, suit: 0x151515, skin: 0xe8b890, hair: 'slick', hairColor: 0x2a1a10, eyes: 'tint', face: ['scar'], outfit: 'suit', scale: 1.1 } },
-  { id: 'manzai',  name: 'THEマンザイ', team: '熊谷の帝王', cls: 'light', stats: { speed: 0.97, accel: 1.14, handling: 1.12, weight: 0.78 },
+  { id: 'manzai', skill: 'bigjump',  name: 'THEマンザイ', team: '熊谷の帝王', cls: 'light', stats: { speed: 0.97, accel: 1.14, handling: 1.12, weight: 0.78 },
     look: { body: 0xffd23f, suit: 0x4a2e1a, skin: 0xd9b48a, headColor: 0x4a2e1a, eyes: 'dots', face: ['monkey'], outfit: 'fur', scale: 0.92 } },
-  { id: 'syun',    name: 'スュンさん',   team: '熊谷の帝王', cls: 'light', stats: { speed: 0.97, accel: 1.12, handling: 1.10, weight: 0.80 },
+  { id: 'syun', skill: 'flash',    name: 'スュンさん',   team: '熊谷の帝王', cls: 'light', stats: { speed: 0.97, accel: 1.12, handling: 1.10, weight: 0.80 },
     look: { body: 0x3b6fb6, suit: 0x1c1c1c, skin: 0xf5c9a0, hair: 'wavy', hairColor: 0x8a5a2b, eyes: 'sun', face: ['beard'], outfit: 'tee', scale: 0.92 } },
-  { id: 'molly',   name: 'モーリー',     team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.02, accel: 0.88, handling: 0.88, weight: 1.32 },
+  { id: 'molly', skill: 'tsuppari',   name: 'モーリー',     team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.02, accel: 0.88, handling: 0.88, weight: 1.32 },
     look: { body: 0x6b3fa0, suit: 0xf5c9a0, skin: 0xf5c9a0, hair: 'topknot', hairColor: 0x111111, eyes: 'dots', outfit: 'sumo', scale: 1.14 } },
-  { id: 'takumi',  name: 'タクミ',       team: '熊谷の帝王', cls: 'mid',   stats: { speed: 1.01, accel: 1.00, handling: 1.02, weight: 1.02 },
+  { id: 'takumi', skill: 'turbo',  name: 'タクミ',       team: '熊谷の帝王', cls: 'mid',   stats: { speed: 1.01, accel: 1.00, handling: 1.02, weight: 1.02 },
     look: { body: 0x8b5a2b, suit: 0xa0703a, skin: 0xffd9b8, hair: 'spiky', hairColor: 0xf2cf4a, eyes: 'dots', face: ['cheeks'], outfit: 'shirt' } },
-  { id: 'hiroshi', name: 'ヒロシ',       team: '熊谷の帝王', cls: 'mid',   stats: { speed: 1.00, accel: 1.02, handling: 1.00, weight: 1.00 },
+  { id: 'hiroshi', skill: 'reflect', name: 'ヒロシ',       team: '熊谷の帝王', cls: 'mid',   stats: { speed: 1.00, accel: 1.02, handling: 1.00, weight: 1.00 },
     look: { body: 0xe8b53a, suit: 0x1f2640, skin: 0xf5c9a0, hair: 'bald', eyes: 'dots', face: ['cheeks'], outfit: 'gakuran' } },
-  { id: 'beniryu', name: 'ベニ龍',       team: '熊谷の帝王', cls: 'light', stats: { speed: 0.96, accel: 1.12, handling: 1.14, weight: 0.78 },
+  { id: 'beniryu', skill: 'dragon', name: 'ベニ龍',       team: '熊谷の帝王', cls: 'light', stats: { speed: 0.96, accel: 1.12, handling: 1.14, weight: 0.78 },
     look: { body: 0xd6282b, suit: 0xd6282b, skin: 0xf5c9a0, hat: 'chinese', eyes: 'round', outfit: 'chinese', scale: 0.92 } },
-  { id: 'kuramochi', name: 'クラモチ',   team: '熊谷の帝王', cls: 'mid',   stats: { speed: 0.99, accel: 1.04, handling: 1.00, weight: 0.98 },
+  { id: 'kuramochi', skill: 'smoke', name: 'クラモチ',   team: '熊谷の帝王', cls: 'mid',   stats: { speed: 0.99, accel: 1.04, handling: 1.00, weight: 0.98 },
     look: { body: 0x6f7f5f, suit: 0x8a9a7a, skin: 0xf0c49c, hair: 'short', hairColor: 0x6a6a6a, eyes: 'dots', face: ['cig'], outfit: 'sweater' } },
-  { id: 'ookami',  name: '案内所の一匹狼', team: '熊谷の帝王', cls: 'mid', stats: { speed: 1.02, accel: 0.98, handling: 0.98, weight: 1.04 },
+  { id: 'ookami', skill: 'lonewolf',  name: '案内所の一匹狼', team: '熊谷の帝王', cls: 'mid', stats: { speed: 1.02, accel: 0.98, handling: 0.98, weight: 1.04 },
     look: { body: 0xff7a1a, suit: 0x1c1c24, skin: 0xf5c9a0, hair: 'pompadour', hairColor: 0xf28a1e, eyes: 'dots', face: ['cig'], outfit: 'open' } },
-  { id: 'sosen',   name: 'ヒロシの先祖', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.04, accel: 0.88, handling: 0.90, weight: 1.26 },
+  { id: 'sosen', skill: 'artillery',   name: 'ヒロシの先祖', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.04, accel: 0.88, handling: 0.90, weight: 1.26 },
     look: { body: 0x7a7a4a, suit: 0x8a8455, skin: 0xf0c49c, hat: 'army', eyes: 'dots', outfit: 'army', scale: 1.1 } },
   // 5人乗り：運転手＋後ろ左右＋前左右
-  { id: 'tsuwamono', name: '案内所の強者たち', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.02, accel: 0.86, handling: 0.86, weight: 1.32 },
+  { id: 'tsuwamono', skill: 'volley', name: '案内所の強者たち', team: '熊谷の帝王', cls: 'heavy', stats: { speed: 1.02, accel: 0.86, handling: 0.86, weight: 1.32 },
     look: { body: 0x2a2a2e, scale: 1.12, crew: [
       { suit: 0x1a1a1a, skin: 0xe8b890, hair: 'spiky', hairColor: 0x7a4a22, eyes: 'sun', outfit: 'tank' },
       { suit: 0x6a6e76, skin: 0xe8b890, hat: 'cap', eyes: 'sun', face: ['mask'], outfit: 'tee', pos: [-0.44, -0.04, -0.52], s: 0.85 },
@@ -2701,6 +2834,7 @@ const Layout = {
     btnBrake: { w: 78, h: 78, x: 150, y: 18 },
     btnDrift: { w: 86, h: 86, x: 36, y: 148 },
     btnItem: { w: 78, h: 78, x: 146, y: 112 },
+    btnSkill: { w: 74, h: 74, x: 238, y: 40 },
   },
   pos(id) { const d = this.defs[id], p = Settings.s.layout[id]; return p ? p : { x: d.x, y: d.y }; },
   apply() {
@@ -2836,7 +2970,7 @@ function setupKarts(mode, charIdx) {
   WHEEL.front.count = WHEEL.rear.count = KARTS.length * 2;
   SHADOW.count = KARTS.length;
 }
-scene.add(WHEEL.front, WHEEL.rear, SHADOW, Sparks.mesh, Items.group, FX.group);
+scene.add(WHEEL.front, WHEEL.rear, SHADOW, Sparks.mesh, Items.group, FX.group, Skills.group);
 
 // =====================================================================
 // GHOST：タイムアタックの最速走行を記録・再生（localStorage）
@@ -2981,7 +3115,7 @@ const Show = (() => {
 // =====================================================================
 const UI = {
   spd: $('spd'), msg: $('msg'), warn: $('warn'), count: $('count'), rank: $('rank'),
-  rk: $('rk'), rkn: $('rkn'), gearv: $('gearv'), lap: $('lap'), lapn: $('lapn'), tm: $('tm'), laptime: $('laptime'),
+  rk: $('rk'), rkn: $('rkn'), gearv: $('gearv'), smoke: $('smokeOv'), skKey: '', lap: $('lap'), lapn: $('lapn'), tm: $('tm'), laptime: $('laptime'),
   portrait: matchMedia('(orientation: portrait)'), itemSlot: $('itemSlot'), itemName: $('itemName'), lastItem: '', lastState: 'none',
   vig: $('vignette'), flash: $('flash'), lines: $('speedlines'), banner: $('banner'), alert: $('alert'), vigA: 0, flashA: 0, lastAlert: '',
 };
@@ -2993,6 +3127,7 @@ const Screen = {
   update(dt) {
     const F = CFG.fx;
     UI.vigA = Math.max(0, UI.vigA - dt * 1.6); UI.flashA = Math.max(0, UI.flashA - dt * 3);
+    if (App.view === 'race' && PLAYER && PLAYER.blindT > 0) UI.flashA = Math.max(UI.flashA, 0.55 + 0.35 * Math.min(1, PLAYER.blindT)); // 目くらまし
     UI.vig.style.opacity = UI.vigA.toFixed(2); UI.flash.style.opacity = UI.flashA.toFixed(2);
     const b = App.view === 'race' && PLAYER.boostT > 0 ? (PLAYER.lastBoost === 'jet' ? F.speedLines.jet : F.speedLines.other) : 0;
     UI.lines.style.opacity = b;
@@ -3016,6 +3151,13 @@ FX.onEvent = (type, k, owner, src) => {
 };
 Race.onReset = () => { UI.msg.style.display = 'none'; UI.warn.style.display = 'none'; UI.alert.style.display = 'none'; UI.lastAlert = ''; };
 Race.onGo = () => App.onGo();
+Skills.onEvent = (type, k, by) => {
+  const S = SKILLS[by.char.skill];
+  if (type === 'use') { if (by.isPlayer) Screen.banner(`${S.icon} ${S.name}！`, '#ffd64a'); Sound.playAt(by.char.skill === 'volley' ? 'shotFire' : by.char.skill === 'artillery' ? 'strikeLock' : 'turbo3', by.x, by.z, 1.2); }
+  if (type === 'blind' && k.isPlayer) Screen.banner(`${by.name}の${S.name}！`, '#ffffff');
+  if (type === 'target' && k.isPlayer) Screen.banner(`${by.name}の砲撃が来る！`, '#ff8a5a');
+  if (type === 'boom') Sound.playAt('strikeFire', k.x, k.z, 1.2);
+};
 Items.onUse = (k, it) => {
   const name = ['shotFire', 'homingFire', 'trapDrop', null, 'shield', 'strikeLock'][it]; // ジェットはブースト検出側で鳴らす
   if (!name) return;
@@ -3026,6 +3168,10 @@ Items.onBounce = s => Sound.playAt('bounce', s.x, s.z);
 function updateHUD(dt) {
   const p = PLAYER, R = CFG.race, ta = App.mode === 'ta';
   UI.spd.textContent = Math.round(Math.abs(p.speed) * 3.6);
+  { const b = $('btnSkill'), S = SKILLS[p.char.skill], pc = Math.round(p.sp * 100), key = pc + S.name;
+    if (UI.skKey !== key) { UI.skKey = key; $('skillLab').innerHTML = `${S.icon}<br>${pc >= 100 ? S.name : pc + '%'}`;
+      b.style.background = `conic-gradient(rgba(255,214,70,.75) ${pc * 3.6}deg, rgba(255,255,255,.16) 0)`; b.classList.toggle('ready', pc >= 100); } }
+  UI.smoke.style.opacity = p.smokeT > 0 ? '0.75' : '0'; if (p.smokeT > 0) p.smokeT -= dt;
   { const g = Sound.ready ? Sound.gear + '速' : ''; if (UI.gearv.textContent !== g) UI.gearv.textContent = g; }
   UI.rk.textContent = p.rank;
   UI.lap.textContent = Math.max(1, Math.min(R.laps, p.lap));
@@ -3101,7 +3247,8 @@ const Menu = {
         <div class="rowb"><div class="mbtn dim" data-act="back" data-v="mode">戻る</div><div class="mbtn primary" data-act="charOk">決定</div></div></div>
         <div class="statcard"><div class="nm">${c.name}</div><div style="opacity:.8;margin-bottom:4px">${c.team ? c.team + '・' : ''}${CLS_NAME[c.cls]}</div>
         <div>最高速　<span class="stars">${starsOf('speed', s.speed)}</span></div><div>加速　　<span class="stars">${starsOf('accel', s.accel)}</span></div>
-        <div>ハンドリング <span class="stars">${starsOf('handling', s.handling)}</span></div><div>重さ　　<span class="stars">${starsOf('weight', s.weight)}</span></div></div>`;
+        <div>ハンドリング <span class="stars">${starsOf('handling', s.handling)}</span></div><div>重さ　　<span class="stars">${starsOf('weight', s.weight)}</span></div>
+        <div style="margin-top:6px;color:#ffd64a">技：${SKILLS[c.skill].icon} ${SKILLS[c.skill].name}</div><div style="font-size:12px;opacity:.9;max-width:230px">${SKILLS[c.skill].desc}</div></div>`;
     },
     course: () => `<div class="panel"><h2>コース選択</h2>
         ${CUPS.map((cup, k) => `<p class="note">${cup.name}</p><div class="grid2">${cupCourses(k).map(i => { const b = Ghost.best(i); return `<div class="mbtn" data-act="course" data-v="${i}">${COURSES[i].name}<small>ベスト ${b ? fmt(b) : '記録なし'}</small></div>`; }).join('')}</div>`).join('')}
@@ -3308,6 +3455,7 @@ const App = {
     this.view = 'race'; this.resultShown = false; this.pressT = -1; this.accelWas = false;
     Menu.hide(); $('ui').style.display = 'block';
     Sound.bgm(TRACK.def.bgm || 'green'); Sound.tempo(1); this.snd = {};
+    Skills.enabled = this.mode !== 'ta'; $('btnSkill').style.display = Skills.enabled ? '' : 'none';
     UI.rank.style.display = this.mode === 'ta' ? 'none' : ''; UI.rkn.textContent = KARTS.length; UI.lapn.textContent = CFG.race.laps;
   },
   restartRace() { if (this.view === 'race' && !this.resultShown) this.startRace(COURSE_IDX); },
@@ -3345,7 +3493,7 @@ const App = {
     S.drift = p.drifting;
     if (p.boostT > (S.boost || 0) + 0.05) {
       const w = p.lastBoost;
-      Sound.play(w.startsWith('miniturbo') ? 'turbo' + w.slice(-1) : ['dash', 'jet', 'trick', 'rocket'].includes(w) ? w : 'dash');
+      if (w !== 'skill') Sound.play(w.startsWith('miniturbo') ? 'turbo' + w.slice(-1) : ['dash', 'jet', 'trick', 'rocket'].includes(w) ? w : 'dash');
     }
     S.boost = p.boostT;
     if (p.grounded && S.grounded === false && p.lastLand > SC.landMin) Sound.play('land', Math.min(1, p.lastLand / 15));
@@ -3434,7 +3582,7 @@ function updateDebug(dt, order) {
     `speed ${(k.speed * 3.6).toFixed(1)} km/h  drift ${k.drifting ? (k.driftDir > 0 ? 'R' : 'L') : '-'} lv${driftLevel(k.charge)} boost ${k.boostT.toFixed(2)} ${k.lastBoost}\n` +
     `sample ${k.idx}/${TRACK.N}  cp ${k.cp}/${Race.CPN}  lap ${k.lap}  rocket press ${App.pressT.toFixed(2)}\n` +
     `items: shot ${Items.shots.length} homing ${Items.homings.length} trap ${Items.traps.length} strike ${Items.strikes.length}  ghost ${Ghost.data ? (Ghost.data.frames.length / 7) + 'f' : '-'} rec ${Ghost.rec.length / 7}f\n` +
-    order.map(o => `${o.rank}. ${o.name.padEnd(4)} L${o.lap} cp${String(o.cp).padStart(2)} ${o.progress < 1e5 ? o.progress.toFixed(2) : 'fin'} x${o.speedMul.toFixed(3)}${o.isCPU ? ' skill' + o.ai.skill.toFixed(2) : ''} ${o.itemState === 'have' ? CFG.items.icons[o.item] : ''}${o.spinT > 0 ? ' SPIN' : ''}`).join('\n'));
+    order.map(o => `${o.rank}. ${o.name.padEnd(4)} L${o.lap} cp${String(o.cp).padStart(2)} ${o.progress < 1e5 ? o.progress.toFixed(2) : 'fin'} x${o.speedMul.toFixed(3)}${o.isCPU ? ' skill' + o.ai.skill.toFixed(2) : ''} ${o.itemState === 'have' ? CFG.items.icons[o.item] : ''}${o.spinT > 0 ? ' SPIN' : ''} 技${Math.round(o.sp * 100)}%`).join('\n'));
 }
 
 // =====================================================================
@@ -3475,11 +3623,14 @@ renderer.setAnimationLoop(now => {
       if (n === CFG.physics.maxSteps) acc = 0;
       for (const k of KARTS) Rescue.update(k, dt);
       if (Input.itemEdge && !PLAYER.finished) Items.use(PLAYER);
+      if (Input.skillEdge && !PLAYER.finished) Skills.use(PLAYER);
+      for (const k of KARTS) Skills.fill(k, dt);
       order = Race.rank();
       applyRubberBand(KARTS);
     } else Input.driftEdge = false;
     pt1 = performance.now(); pPhys = pt1 - pt0 - pAI;
-    Input.itemEdge = false;
+    Input.itemEdge = false; Input.skillEdge = false;
+    Skills.frame(Race.running() && !paused ? dt : 0, now / 1000);
     KARTS.forEach(updateKartVisual);
     WHEEL.front.instanceMatrix.needsUpdate = WHEEL.rear.instanceMatrix.needsUpdate = SHADOW.instanceMatrix.needsUpdate = true;
     Sparks.update(paused ? 0 : dt, KARTS);
